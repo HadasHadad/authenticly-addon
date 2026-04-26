@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Highlight Images",
+  "version": "1.0",
+  "description": "Adds a yellow border to all images",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}
