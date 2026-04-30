@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת אימות קהילתית</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="post-container">
+        <!-- בועת הדירוג המשודרגת -->
+        <div class="trust-tooltip"> 
+            
+            <!-- מצב הצבעה -->
+            <div class="vote-container">
+                <span class="vote-label">האם התוכן אמיתי?</span>
+                <div class="vote-options">
+                    <button class="vote-btn btn-real">✨ Real</button>
+                    <button class="vote-btn btn-ai">🤖 AI</button>
+                </div>
+            </div>
+
+            <!-- מצב תוצאות -->
+            <div class="results-container">
+                <div class="result-item">
+                    <div class="circle real-circle">
+                        <span class="percent-text" id="real-val">0%</span>
+                    </div>
+                    <span class="result-label">Real</span>
+                    <span class="vote-count" id="real-count">0 הצביעו</span>
+                </div>
+                
+                <div class="divider"></div>
+
+                <div class="result-item">
+                    <div class="circle ai-circle">
+                        <span class="percent-text" id="ai-val">0%</span>
+                    </div>
+                    <span class="result-label">AI</span>
+                    <span class="vote-count" id="ai-count">0 הצביעו</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- תמונת רקע לדוגמה -->
+        <div class="post-bg"></div>
+    </div>
+
+    <script>
+        const tooltip = document.querySelector('.trust-tooltip');
+        const voteButtons = document.querySelectorAll('.vote-btn');
+        
+        voteButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const totalVotes = Math.floor(Math.random() * 4000) + 1200;
+                const realPercent = Math.floor(Math.random() * 30) + 65;
+                const aiPercent = 100 - realPercent;
+
+                const realPeople = Math.round((totalVotes * realPercent) / 100);
+                const aiPeople = totalVotes - realPeople;
+
+                document.getElementById('real-val').innerText = realPercent + "%";
+                document.getElementById('ai-val').innerText = aiPercent + "%";
+                
+                document.getElementById('real-count').innerText = realPeople.toLocaleString();
+                document.getElementById('ai-count').innerText = aiPeople.toLocaleString();
+
+                document.querySelector('.real-circle').style.background = `conic-gradient(#00ff88 ${realPercent}%, rgba(255,255,255,0.1) 0)`;
+                document.querySelector('.ai-circle').style.background = `conic-gradient(#ff4bbc ${aiPercent}%, rgba(255,255,255,0.1) 0)`;
+
+                tooltip.classList.add('voted');
+            });
+        });
+    </script>
+</body>
+</html>
+
+
+</body>
+</html>
+
+
