@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/HadasHadad/authenticly-addon#readme",
   "dependencies": {
+    "cors": "^2.8.6",
     "express": "^5.2.1"
   }
 }
