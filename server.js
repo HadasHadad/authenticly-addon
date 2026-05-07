@@ -1,111 +1,102 @@
+const express = require("express");
+const cors = require("cors");
+const mongoose = require("mongoose");
 
-let votesMock = {}
-
-app.use(express.static('public'))
-app.use(express.json()) 
-const express = require('express');
-const cors = require('cors');
 const app = express();
 
 app.use(cors());
+app.use(express.json());
+app.use(express.static("public"));
 
+mongoose
+  .connect("mongodb://127.0.0.1:27017/imagesDB")
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.log(err));
 
+const imageSchema = new mongoose.Schema({
+  imageUrl: String,
 
-const votesMock = {
-    "test": { real: 10, ai: 40, votedIPs: [] },
-    "image123": { real: 5, ai: 5, votedIPs: ['127.0.0.1'] }
-};
+  realCount: {
+    type: Number,
+    default: 0,
+  },
 
-app.get('/front', (req, res) => {
-    const imageUrl = req.query.url
+  aiCount: {
+    type: Number,
+    default: 0,
+  },
+});
 
-    if (!imageUrl) {
-        return res.status(400).json({ error: 'missing url' });
-    }
+const Image = mongoose.model("Image", imageSchema);
 
-    if (votesMock[imageUrl]) {
-        return res.json(votesMock[imageUrl])
-    }
+app.get("/front", async (req, res) => {
+  const imageUrl = req.query.url;
 
-    return res.json({
-        real: 0,
-        ai: 0
-    })
-})
-
-
-app.post('/vote', (req, res) => {
-    const { url, voteType } = req.body
-    const url = req.query.url;
-
-    if (!url || !votesMock[url]) {
-        return res.status(404).json({ error: 'URL not found in database' });
-    }
-
-    let data = votesMock[url];
-    let total = data.real + data.ai;
-
-    let aiPercentage = total === 0 ? 0 : (data.ai / total) * 100;
-    let realPercentage = total === 0 ? 0 : (data.real / total) * 100;
-
-    let mostVoted = "Tie"; 
-    if (data.ai > data.real) mostVoted = "AI";
-    if (data.real > data.ai) mostVoted = "Real";
-
-    res.json({
-        url: url,
-        totalVotes: total,
-        aiPercentage: aiPercentage,
-        realPercentage: realPercentage,
-        mostVoted: mostVoted
+  if (!imageUrl) {
+    return res.status(400).json({
+      error: "missing url",
     });
+  }
+
+  let image = await Image.findOne({
+    imageUrl: imageUrl,
+  });
+
+  if (!image) {
+    image = await Image.create({
+      imageUrl: imageUrl,
+      realCount: 0,
+      aiCount: 0,
+    });
+  }
+
+  res.json({
+    real: image.realCount,
+    ai: image.aiCount,
+  });
 });
 
-app.post('/vote', (req, res) => {
-    const { url, vote } = req.body;
-    const userIP = req.ip;
+app.post("/vote", async (req, res) => {
+  const { url, voteType } = req.body;
 
-    if (!votesMock[url]) {
-        votesMock[url] = { real: 0, ai: 0, votedIPs: [] };
-    }
+  if (!url || !voteType) {
+    return res.status(400).json({
+      error: "missing url or voteType",
+    });
+  }
 
-    if (votesMock[url].votedIPs.includes(userIP)) {
-        return res.status(403).json({ error: "כבר הצבעת לתמונה זו!" });
-    }
+  let image = await Image.findOne({
+    imageUrl: url,
+  });
 
-    if (vote === true || vote === "true") {
-        votesMock[url].ai += 1;
-    } else {
-        votesMock[url].real += 1;
-    }
+  if (!image) {
+    image = await Image.create({
+      imageUrl: url,
+      realCount: 0,
+      aiCount: 0,
+    });
+  }
 
-    votesMock[url].votedIPs.push(userIP);
+  if (voteType === "ai") {
+    image.aiCount++;
+  } else if (voteType === "real") {
+    image.realCount++;
+  } else {
+    return res.status(400).json({
+      error: "invalid voteType",
+    });
+  }
 
-    console.log(`New vote for ${url} from IP ${userIP}`);
-    res.json({ status: "success", message: "הצבעתך התקבלה!" });
+  await image.save();
+
+  res.json({
+    real: image.realCount,
+    ai: image.aiCount,
+  });
 });
 
-    if (!url || !voteType) {
-        return res.status(400).json({ error: 'missing url or voteType' })
-    }
+const port = 3000;
 
-    
-    if (!votesMock[url]) {
-        votesMock[url] = { real: 0, ai: 0 }
-    }
-
-    if (voteType === 'ai') {
-        votesMock[url].ai++
-    } else if (voteType === 'real') {
-        votesMock[url].real++
-    } else {
-        return res.status(400).json({ error: 'invalid voteType' })
-    }
-
-    return res.json(votesMock[url])
-})
-
-const port = 3000
 app.listen(port, () => {
-    console.log(`server running on http://localhost:${port}`)
+  console.log(`server running on http://localhost:${port}`);
 });
