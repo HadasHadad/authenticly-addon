@@ -1,119 +1,138 @@
-/* עיצוב כללי */
+:root {
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --real-color: #2e7d32;
+    --ai-color: #c2185b;
+    --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+}
+
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f0f2f5;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #eef2f7;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
     margin: 0;
-    direction: rtl;
 }
 
-/* מכל הפוסט */
 .post-container {
     position: relative;
-    width: 400px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    overflow: visible;
+    width: 220px;
+    height: 155px;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
 }
 
-.post-image {
+.post-bg {
     width: 100%;
-    display: block;
-    border-radius: 0 0 12px 12px;
-    filter: brightness(0.9);
+    height: 100%;
+    background: linear-gradient(45deg, #667eea 0%, #e6cdff 100%);
 }
 
-/* בועת הדירוג - Tooltip */
+/* עיצוב הבועה - Glassmorphism */
 .trust-tooltip {
     position: absolute;
     top: 20px;
     left: 20px;
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(10px);
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.3);
-    padding: 12px 16px;
-    border-radius: 18px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    animation: fadeInScale 0.5s ease-out;
+    padding: 16px;
+    border-radius: 22px;
+    box-shadow: var(--shadow);
     z-index: 10;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes fadeInScale {
-    from { opacity: 0; transform: scale(0.9) translateY(10px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
+.vote-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    text-align: center;
+    color: #1a1a1a;
 }
 
-/* עיגול האחוזים */
-.percentage-circle {
-    position: relative;
-    width: 50px;
-    height: 50px;
+.vote-options {
+    display: flex;
+    gap: 12px;
+}
+
+.vote-btn {
+    border: none;
+    padding: 10px 20px;
+    border-radius: 14px;
+    cursor: pointer;
+    font-weight: 800;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.btn-real { background: #e8f5e9; color: var(--real-color); }
+.btn-ai { background: #fce4ec; color: var(--ai-color); }
+
+.vote-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+}
+
+/* תוצאות */
+.results-container {
+    display: none;
+    gap: 20px;
+    align-items: center;
+}
+
+.divider {
+    width: 1px;
+    height: 40px;
+    background: rgba(0,0,0,0.1);
+}
+
+.trust-tooltip.voted .results-container { display: flex; animation: slideUp 0.4s ease; }
+.trust-tooltip.voted .vote-container { display: none; }
+
+.result-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.result-label { font-size: 10px; font-weight: 800; color: #666; margin-top: 4px; }
+.vote-count { font-size: 9px; color: #999; }
+
+/* עיגולים מעוצבים */
+.circle {
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
-    background: conic-gradient(#4caf50 70%, #e0e0e0 0);
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative;
+    background: #eee;
 }
 
-.percentage-circle::after {
+.circle::after {
     content: "";
     position: absolute;
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     background: white;
     border-radius: 50%;
 }
 
-.percentage-text {
+.percent-text {
     position: relative;
     z-index: 1;
-    font-weight: bold;
-    font-size: 14px;
-    color: #2e7d32;
-}
-
-/* טקסט בתוך הבועה */
-.info-content {
-    display: flex;
-    flex-direction: column;
-}
-
-.label {
-    font-size: 11px;
-    color: #65676b;
-    margin-bottom: 2px;
-}
-
-.status {
-    font-weight: bold;
-    font-size: 15px;
-    color: #1c1e21;
-}
-
-.verified-icon {
-    color: #4caf50;
-    font-size: 18px;
-}
-
-.post-content {
-    padding: 15px;
-}
-
-.post-title {
-    font-size: 14px;
-    display: block;
-    margin-bottom: 5px;
-}
-
-.post-description {
     font-size: 13px;
-    color: #444;
-    margin: 0;
+    font-weight: 900;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
