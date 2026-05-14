@@ -1,67 +1,102 @@
-const express = require('express');
-const cors = require('cors');
+const express = require("express");
+const cors = require("cors");
+const mongoose = require("mongoose");
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static("public"));
 
-const votesMock = {
-    "test": { real: 10, ai: 40, votedIPs: [] },
-    "image123": { real: 5, ai: 5, votedIPs: ['127.0.0.1'] }
-};
+mongoose
+  .connect("mongodb://127.0.0.1:27017/imagesDB")
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.log(err));
 
-app.get('/front', (req, res) => {
-    const url = req.query.url;
+const imageSchema = new mongoose.Schema({
+  imageUrl: String,
 
-    if (!url || !votesMock[url]) {
-        return res.status(404).json({ error: 'URL not found in database' });
-    }
+  realCount: {
+    type: Number,
+    default: 0,
+  },
 
-    let data = votesMock[url];
-    let total = data.real + data.ai;
-
-    let aiPercentage = total === 0 ? 0 : (data.ai / total) * 100;
-    let realPercentage = total === 0 ? 0 : (data.real / total) * 100;
-
-    let mostVoted = "Tie"; 
-    if (data.ai > data.real) mostVoted = "AI";
-    if (data.real > data.ai) mostVoted = "Real";
-
-    res.json({
-        url: url,
-        totalVotes: total,
-        aiPercentage: aiPercentage,
-        realPercentage: realPercentage,
-        mostVoted: mostVoted
-    });
+  aiCount: {
+    type: Number,
+    default: 0,
+  },
 });
 
-app.post('/vote', (req, res) => {
-    const { url, vote } = req.body;
-    const userIP = req.ip;
+const Image = mongoose.model("Image", imageSchema);
 
-    if (!votesMock[url]) {
-        votesMock[url] = { real: 0, ai: 0, votedIPs: [] };
-    }
+app.get("/front", async (req, res) => {
+  const imageUrl = req.query.url;
 
-    if (votesMock[url].votedIPs.includes(userIP)) {
-        return res.status(403).json({ error: "כבר הצבעת לתמונה זו!" });
-    }
+  if (!imageUrl) {
+    return res.status(400).json({
+      error: "missing url",
+    });
+  }
 
-    if (vote === true || vote === "true") {
-        votesMock[url].ai += 1;
-    } else {
-        votesMock[url].real += 1;
-    }
+  let image = await Image.findOne({
+    imageUrl: imageUrl,
+  });
 
-    votesMock[url].votedIPs.push(userIP);
+  if (!image) {
+    image = await Image.create({
+      imageUrl: imageUrl,
+      realCount: 0,
+      aiCount: 0,
+    });
+  }
 
-    console.log(`New vote for ${url} from IP ${userIP}`);
-    res.json({ status: "success", message: "הצבעתך התקבלה!" });
+  res.json({
+    real: image.realCount,
+    ai: image.aiCount,
+  });
+});
+
+app.post("/vote", async (req, res) => {
+  const { url, voteType } = req.body;
+
+  if (!url || !voteType) {
+    return res.status(400).json({
+      error: "missing url or voteType",
+    });
+  }
+
+  let image = await Image.findOne({
+    imageUrl: url,
+  });
+
+  if (!image) {
+    image = await Image.create({
+      imageUrl: url,
+      realCount: 0,
+      aiCount: 0,
+    });
+  }
+
+  if (voteType === "ai") {
+    image.aiCount++;
+  } else if (voteType === "real") {
+    image.realCount++;
+  } else {
+    return res.status(400).json({
+      error: "invalid voteType",
+    });
+  }
+
+  await image.save();
+
+  res.json({
+    real: image.realCount,
+    ai: image.aiCount,
+  });
 });
 
 const port = 3000;
+
 app.listen(port, () => {
-    console.log(`server running on http://localhost:${port}`)
+  console.log(`server running on http://localhost:${port}`);
 });
