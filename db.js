@@ -7,8 +7,9 @@ mongoose
 
 const imageSchema = new mongoose.Schema({
   imageUrl: String,
-  realCount: Number,
-  aiCount: Number,
+  realCount: { type: Number, default: 0 },
+  aiCount: { type: Number, default: 0 },
+  votedIPs: [String]
 });
 
 const Image = mongoose.model("Image", imageSchema);
