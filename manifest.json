@@ -4,6 +4,9 @@
   "version": "1.0",
   "description": "Detect if image is AI or real based on public opinion",
   "permissions": ["storage"],
+  "host_permissions": [
+    "http://localhost:3000/*"
+  ],
   "action": {
     "default_popup": "popup.html"
   },
