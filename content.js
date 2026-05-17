@@ -1,6 +1,8 @@
+// ===== AI Image Scanner Extension - Content Script (FIXED FLOATING OVERLAY) =====
 
 const SERVER_URL = "http://localhost:3000";
 
+// פונקציית עזר לניקוי ה-URL
 function normalizeUrl(imageUrl) {
     try {
         const url = new URL(imageUrl);
@@ -10,10 +12,12 @@ function normalizeUrl(imageUrl) {
     }
 }
 
+// יצירת מפתח ייחודי לאלמנט
 function generateId(src) {
     return 'img-btn-' + btoa(encodeURIComponent(src)).replace(/[^a-zA-Z0-9]/g, '');
 }
 
+// בדיקה אם התמונה רלוונטית לסריקה
 function isValidImage(img) {
     return (
         img.src &&
@@ -23,6 +27,7 @@ function isValidImage(img) {
     );
 }
 
+// פונקציה שמזריקה את הבועה המעוצבת ישירות ל-Body וממקמת אותה מעל התמונה
 function injectTrustTool(imageElement) {
     if (!isValidImage(imageElement) || imageElement.dataset.trustInjected) return;
     imageElement.dataset.trustInjected = "true";
@@ -30,14 +35,23 @@ function injectTrustTool(imageElement) {
     const cleanUrl = normalizeUrl(imageElement.src);
     const id = generateId(imageElement.src);
 
+    // יצירת המארח של ה-Shadow DOM כאלמנט צף מוחלט במסך
     const host = document.createElement('div');
     host.id = id;
     host.className = 'trust-tool-container';
     host.style.position = 'absolute';
-    host.style.zIndex = '10000';
-    host.style.top = '15px';
-    host.style.left = '15px';
-    host.style.pointerEvents = 'none';
+    host.style.zIndex = '2147483647'; // ה-Z-Index הכי גבוה האפשרי בדפדפן
+    
+    // פונקציה לעדכון המיקום הפיזי של הבועה ביחס לתמונה
+    function updatePosition() {
+        const rect = imageElement.getBoundingClientRect();
+        // חישוב המיקום כולל הגלילה של העמוד
+        host.style.top = (rect.top + window.scrollY + 15) + 'px';
+        host.style.left = (rect.left + window.scrollX + 15) + 'px';
+    }
+
+    // מיקום ראשוני
+    updatePosition();
 
     const shadow = host.attachShadow({ mode: 'open' });
 
@@ -46,32 +60,42 @@ function injectTrustTool(imageElement) {
     style.textContent = `
         :host { direction: rtl; pointer-events: auto; }
         .trust-bubble {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             padding: 12px 16px;
             border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 10px;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.3s ease;
             border: 1px solid rgba(255,255,255,0.4);
             opacity: 0;
-            transform: scale(0.9) translateY(-10px);
+            transform: scale(0.9);
             min-width: 140px;
         }
-        .trust-bubble.visible { opacity: 1; transform: scale(1) translateY(0); }
+        .trust-bubble.visible { opacity: 1; transform: scale(1); }
         .vote-label { font-size: 13px; font-weight: bold; color: #222; margin-bottom: 4px; }
         .vote-options { display: flex; gap: 8px; }
-        .btn { border: none; padding: 8px 16px; border-radius: 12px; cursor: pointer; font-weight: 800; font-size: 13px; transition: all 0.2s ease; }
+        .btn { 
+            background: #eee; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-weight: 800; 
+            font-size: 13px; 
+            transition: all 0.2s ease; 
+            user-select: none;
+        }
         .btn:hover { transform: scale(1.08); }
         .btn-real { background: #e8f5e9; color: #2e7d32; }
         .btn-ai { background: #fce4ec; color: #c2185b; }
-        .results { display: none; gap: 15px; opacity: 0; transform: translateY(5px); transition: all 0.4s ease; }
+        .results { display: none; gap: 15px; opacity: 0; transition: all 0.3s ease; }
         .voted .vote-options, .voted .vote-label { display: none; }
-        .voted .results { display: flex; opacity: 1; transform: translateY(0); }
+        .voted .results { display: flex; opacity: 1; }
         .result-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .circle { width: 48px; height: 48px; border-radius: 50%; display: flex; justify-content: center; align-items: center; background: #eee; position: relative; }
         .circle::after { content: ""; position: absolute; width: 38px; height: 38px; background: white; border-radius: 50%; }
@@ -82,22 +106,25 @@ function injectTrustTool(imageElement) {
 
     const bubble = document.createElement('div');
     bubble.className = 'trust-bubble';
-    bubble.innerHTML = `<span class="loading">טוען נתונים...</span>`;
+    bubble.innerHTML = `<span class="loading">טוען...</span>`;
 
     shadow.appendChild(style);
     shadow.appendChild(bubble);
 
-    const parent = imageElement.parentElement;
-    if (parent && getComputedStyle(parent).position === 'static') {
-        parent.style.position = 'relative';
-    }
-    parent.appendChild(host);
+    // הזרקה ישירות לתוך ה-BODY (מחוץ לכל הלינקים והאלמנטים המשבשים של האתר)
+    document.body.appendChild(host);
 
     setTimeout(() => bubble.classList.add('visible'), 50);
 
+    // עדכון מיקום מחדש אם חלון הדפדפן משתנה
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition);
+
+    // שלב א': בדיקה ב-Storage המקומי
     chrome.storage.local.get(cleanUrl, (storageResult) => {
         const hasVotedLocally = !!storageResult[cleanUrl];
 
+        // שלב ב': משיכת הנתונים מהשרת
         fetch(`${SERVER_URL}/front?url=${encodeURIComponent(cleanUrl)}`)
             .then(res => res.json())
             .then(serverData => {
@@ -110,21 +137,20 @@ function injectTrustTool(imageElement) {
                     aiPercent = 100 - realPercent;
                 }
 
-                // אם כבר הצביע - מציגים ישר את הגרף
                 if (hasVotedLocally) {
                     showResultsUI(bubble, realPercent, aiPercent);
                 } else {
-                    // אם לא הצביע - מציגים את כפתורי ההצבעה
                     showVoteOptionsUI(bubble, cleanUrl, realPercent, aiPercent);
                 }
             })
             .catch(err => {
                 console.error("Error fetching stats:", err);
-                bubble.innerHTML = `<span class="loading">שגיאה בחיבור לשרת</span>`;
+                bubble.innerHTML = `<span class="loading">שגיאה בשרת</span>`;
             });
     });
 }
 
+// הצגת כפתורי הצבעה
 function showVoteOptionsUI(bubble, cleanUrl, realPercent, aiPercent) {
     bubble.innerHTML = `
         <span class="vote-label">האם התמונה אמיתית?</span>
@@ -144,24 +170,35 @@ function showVoteOptionsUI(bubble, cleanUrl, realPercent, aiPercent) {
         </div>
     `;
 
-    bubble.querySelector('#vote-real').onclick = (e) => {
-        e.preventDefault();
-        sendVote(cleanUrl, 'real', bubble);
-    };
+    // ביטול מוחלט של בעבוע האירועים מעבר לבועה שלנו
+    bubble.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
 
-    bubble.querySelector('#vote-ai').onclick = (e) => {
+    bubble.querySelector('#vote-real').addEventListener('click', (e) => {
         e.preventDefault();
+        e.stopPropagation();
+        sendVote(cleanUrl, 'real', bubble);
+    });
+
+    bubble.querySelector('#vote-ai').addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         sendVote(cleanUrl, 'ai', bubble);
-    };
+    });
 }
 
+// שליחת הצבעה לשרת
 function sendVote(cleanUrl, voteType, bubble) {
     fetch(`${SERVER_URL}/vote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: cleanUrl, voteType: voteType }) // תוקן ל-voteType שמתאים לשרת
+        body: JSON.stringify({ url: cleanUrl, voteType: voteType })
     })
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) throw new Error("Server error");
+        return res.json();
+    })
     .then(updatedData => {
         const total = (updatedData.real || 0) + (updatedData.ai || 0);
         const realPercent = total > 0 ? Math.round((updatedData.real / total) * 100) : 0;
@@ -171,9 +208,13 @@ function sendVote(cleanUrl, voteType, bubble) {
             showResultsUI(bubble, realPercent, aiPercent);
         });
     })
-    .catch(err => console.error("Error sending vote:", err));
+    .catch(err => {
+        console.error("Error sending vote:", err);
+        alert("שגיאה בשליחת ההצבעה!");
+    });
 }
 
+// הצגת הגרפים המעוצבים
 function showResultsUI(bubble, realPercent, aiPercent) {
     if (bubble.querySelector('.results')) {
         bubble.querySelector('#t-real').innerText = realPercent + '%';
@@ -183,7 +224,7 @@ function showResultsUI(bubble, realPercent, aiPercent) {
         bubble.classList.add('voted');
     } else {
         bubble.innerHTML = `
-            <div class="results" style="display: flex; opacity: 1; transform: translateY(0);">
+            <div class="results" style="display: flex; opacity: 1;">
                 <div class="result-item">
                     <div class="circle" id="c-real" style="background: conic-gradient(#4caf50 ${realPercent}%, #eee 0)"><span class="percent">${realPercent}%</span></div>
                     <span class="res-name">Real</span>
@@ -197,6 +238,7 @@ function showResultsUI(bubble, realPercent, aiPercent) {
     }
 }
 
+// סורק התמונות
 function scanImages() {
     const images = document.querySelectorAll('img');
     images.forEach((img) => {
@@ -208,7 +250,7 @@ function scanImages() {
     });
 }
 
-// ה-Observer של חניך 1 שעוקב אחרי שינויים בדף
+// המעקב אחרי שינויים בדף
 const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
