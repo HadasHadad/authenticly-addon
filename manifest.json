@@ -3,8 +3,13 @@
   "name": "Authenticly",
   "version": "1.0",
   "description": "Detect if image is AI or real based on public opinion",
+  "background": {
+    "service_worker": "background.js"
+  },
   "permissions": ["storage"],
   "host_permissions": [
+    "*://*.ynet.co.il/*",
+    "*://*.google.com/*",
     "http://localhost:3000/*"
   ],
   "action": {
