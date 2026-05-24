@@ -38,13 +38,35 @@ function injectTrustTool(imageElement) {
 
     host.style.position = 'absolute';
     host.style.zIndex = '2147483647';
-    host.style.willChange = 'transform';
+
+    function updatePosition() {
+
+        const rect = imageElement.getBoundingClientRect();
+
+        let top = rect.top + window.scrollY + 15;
+        let left = rect.left + window.scrollX + 15;
+
+        const bubbleWidth = 160;
+
+        if (left + bubbleWidth > window.innerWidth) {
+            left = window.innerWidth - bubbleWidth - 20;
+        }
+
+        host.style.top = top + 'px';
+        host.style.left = left + 'px';
+    }
+
+    updatePosition();
+
+    window.addEventListener('scroll', updatePosition);
+    window.addEventListener('resize', updatePosition);
 
     const shadow = host.attachShadow({ mode: 'open' });
 
     const style = document.createElement('style');
 
     style.textContent = `
+    
     :host {
         direction: rtl;
         pointer-events: auto;
@@ -52,20 +74,29 @@ function injectTrustTool(imageElement) {
     }
 
     .trust-bubble {
+
         background: rgba(255,255,255,0.93);
         backdrop-filter: blur(12px);
+
         padding: 10px;
         border-radius: 18px;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+
+        box-shadow:
+            0 8px 30px rgba(0,0,0,0.18);
+
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 10px;
-        transition: all 0.2s ease;
+
+        transition: all 0.25s ease;
+
         opacity: 0;
         transform: scale(0.92);
+
         min-width: 110px;
         max-width: 145px;
+
         position: relative;
     }
 
@@ -85,15 +116,27 @@ function injectTrustTool(imageElement) {
         font-size: 12px;
         font-weight: 800;
         color: #222;
+        letter-spacing: 0.3px;
     }
 
     .close-btn {
+
         border: none;
         background: transparent;
+
         cursor: pointer;
+
         font-size: 14px;
         color: #666;
+
         padding: 0;
+
+        transition: 0.2s;
+    }
+
+    .close-btn:hover {
+        color: #111;
+        transform: scale(1.1);
     }
 
     .vote-label {
@@ -109,17 +152,35 @@ function injectTrustTool(imageElement) {
     }
 
     .btn {
+
         border: none;
         border-radius: 999px;
+
         padding: 6px 10px;
+
         cursor: pointer;
+
         font-size: 12px;
         font-weight: 700;
+
         flex: 1;
+
+        transition: 0.2s ease;
     }
 
-    .btn-real { background: #e8f5e9; color: #2e7d32; }
-    .btn-ai { background: #fde7ef; color: #c2185b; }
+    .btn:hover {
+        transform: scale(1.04);
+    }
+
+    .btn-real {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .btn-ai {
+        background: #fde7ef;
+        color: #c2185b;
+    }
 
     .results {
         display: none;
@@ -136,97 +197,142 @@ function injectTrustTool(imageElement) {
     }
 
     .result-item {
+
         display: flex;
         flex-direction: column;
         align-items: center;
+
         gap: 6px;
+
         font-size: 12px;
         color: #333;
     }
 
     .circle {
+
         width: 56px;
         height: 56px;
+
         border-radius: 50%;
+
         display: flex;
         justify-content: center;
         align-items: center;
+
         font-size: 14px;
         font-weight: 800;
+
         color: #111;
+
         background: #eee;
+
+        box-shadow:
+            inset 0 0 0 3px rgba(255,255,255,0.6);
     }
+
+    @media (max-width: 600px) {
+
+        .trust-bubble {
+            min-width: 100px;
+            padding: 8px;
+        }
+
+        .circle {
+            width: 48px;
+            height: 48px;
+            font-size: 12px;
+        }
+
+        .btn {
+            padding: 5px 8px;
+            font-size: 11px;
+        }
+    }
+
     `;
 
     const bubble = document.createElement('div');
     bubble.className = 'trust-bubble';
-    bubble.innerHTML = `<span>טוען...</span>`;
+
+    bubble.innerHTML = `<span class="loading">טוען...</span>`;
 
     shadow.appendChild(style);
     shadow.appendChild(bubble);
+
     document.body.appendChild(host);
 
     setTimeout(() => bubble.classList.add('visible'), 50);
 
-    // ===== FIXED POSITION (יציב לגוגל תמונות) =====
-    function updatePosition() {
-        const rect = imageElement.getBoundingClientRect();
-
-        const top = rect.top + window.scrollY;
-        const left = rect.left + window.scrollX;
-
-        host.style.transform = `translate(${left + 12}px, ${top + 12}px)`;
-        host.style.top = '0px';
-        host.style.left = '0px';
-    }
-
-    function startTracking() {
-        updatePosition();
-        setInterval(updatePosition, 30);
-        window.addEventListener('resize', updatePosition);
-    }
-
-    startTracking();
-
-    // ===== SERVER =====
     chrome.runtime.sendMessage({
         action: "fetchData",
         url: `${SERVER_URL}/front?url=${encodeURIComponent(cleanUrl)}`
     }, (response) => {
 
-        if (!response || !response.data) {
-            bubble.innerHTML = "שגיאת שרת";
-            return;
+        if (response && response.data) {
+
+            const { real, ai } = response.data;
+
+            const total = real + ai;
+
+            const realPercent =
+                total > 0
+                    ? Math.round((real / total) * 100)
+                    : 0;
+
+            const aiPercent = 100 - realPercent;
+
+            chrome.storage.local.get(cleanUrl, (s) => {
+
+                if (s[cleanUrl]) {
+                    showResultsUI(bubble, realPercent, aiPercent);
+                } else {
+                    showVoteOptionsUI(
+                        bubble,
+                        cleanUrl,
+                        realPercent,
+                        aiPercent
+                    );
+                }
+            });
+
+        } else {
+
+            bubble.innerHTML =
+                `<span class="loading">שגיאת שרת</span>`;
         }
-
-        const { real, ai } = response.data;
-        const total = real + ai;
-
-        const realPercent = total > 0 ? Math.round((real / total) * 100) : 0;
-        const aiPercent = 100 - realPercent;
-
-        chrome.storage.local.get(cleanUrl, (s) => {
-            if (s[cleanUrl]) {
-                showResultsUI(realPercent, aiPercent);
-            } else {
-                showVoteOptionsUI(cleanUrl, realPercent, aiPercent);
-            }
-        });
     });
+}
 
-    function attachCloseEvent() {
-        const btn = bubble.querySelector('.close-btn');
-        if (!btn) return;
+function attachCloseEvent(bubble) {
 
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            host.remove();
-        };
-    }
+    const closeBtn = bubble.querySelector('.close-btn');
 
-    function showVoteOptionsUI(cleanUrl, realPercent, aiPercent) {
+    if (!closeBtn) return;
 
-        bubble.innerHTML = `
+    closeBtn.onclick = () => {
+
+        bubble.style.opacity = '0';
+        bubble.style.transform = 'scale(0.8)';
+
+        setTimeout(() => {
+
+            if (bubble.parentElement?.host) {
+                bubble.parentElement.host.remove();
+            }
+
+        }, 200);
+    };
+}
+
+function showVoteOptionsUI(
+    bubble,
+    cleanUrl,
+    realPercent,
+    aiPercent
+) {
+
+    bubble.innerHTML = `
+
         <div class="top-bar">
             <span class="brand">Authenticly</span>
             <button class="close-btn">✕</button>
@@ -235,78 +341,205 @@ function injectTrustTool(imageElement) {
         <span class="vote-label">אמיתי או AI?</span>
 
         <div class="vote-options">
-            <button class="btn btn-real" id="vote-real">Real</button>
-            <button class="btn btn-ai" id="vote-ai">AI</button>
+
+            <button
+                class="btn btn-real"
+                id="vote-real">
+
+                Real
+
+            </button>
+
+            <button
+                class="btn btn-ai"
+                id="vote-ai">
+
+                AI
+
+            </button>
+
         </div>
 
         <div class="results">
+
             <div class="result-item">
-                <div class="circle">${realPercent}%</div>
+
+                <div
+                    class="circle"
+                    id="c-real">
+
+                    ${realPercent}%
+
+                </div>
+
                 Real
+
             </div>
+
             <div class="result-item">
-                <div class="circle">${aiPercent}%</div>
+
+                <div
+                    class="circle"
+                    id="c-ai">
+
+                    ${aiPercent}%
+
+                </div>
+
                 AI
+
             </div>
+
         </div>
-        `;
+    `;
 
-        bubble.querySelector('#vote-real').onclick =
-            () => sendVote(cleanUrl, 'real');
+    bubble.querySelector('#vote-real').onclick =
+        () => sendVote(cleanUrl, 'real', bubble);
 
-        bubble.querySelector('#vote-ai').onclick =
-            () => sendVote(cleanUrl, 'ai');
+    bubble.querySelector('#vote-ai').onclick =
+        () => sendVote(cleanUrl, 'ai', bubble);
 
-        attachCloseEvent();
-    }
+    attachCloseEvent(bubble);
+}
 
-    function showResultsUI(real, ai) {
+function sendVote(cleanUrl, voteType, bubble) {
 
-        const total = real + ai;
-        const rP = total > 0 ? Math.round((real / total) * 100) : 0;
-        const aP = 100 - rP;
+    chrome.runtime.sendMessage({
 
-        bubble.innerHTML = `
+        action: "fetchData",
+
+        url: `${SERVER_URL}/vote`,
+
+        method: "POST",
+
+        body: {
+            url: cleanUrl,
+            voteType: voteType
+        }
+
+    }, (response) => {
+
+        if (response && response.data) {
+
+            chrome.storage.local.set({
+
+                [cleanUrl]: { voted: true }
+
+            }, () => {
+
+                showResultsUI(
+                    bubble,
+                    response.data.real,
+                    response.data.ai
+                );
+            });
+
+        } else {
+
+            alert("שגיאה בשליחה!");
+        }
+    });
+}
+
+function showResultsUI(bubble, real, ai) {
+
+    const total = real + ai;
+
+    const rP =
+        total > 0
+            ? Math.round((real / total) * 100)
+            : 0;
+
+    const aP = 100 - rP;
+
+    bubble.innerHTML = `
+
         <div class="top-bar">
-            <span class="brand">Authenticly</span>
-            <button class="close-btn">✕</button>
+
+            <span class="brand">
+                Authenticly
+            </span>
+
+            <button class="close-btn">
+                ✕
+            </button>
+
         </div>
 
-        <div class="results" style="display:flex;">
+        <div
+            class="results"
+            style="display:flex;">
+
             <div class="result-item">
-                <div class="circle">${rP}%</div>
+
+                <div
+                    class="circle"
+
+                    style="
+                    background:
+                    conic-gradient(
+                        #4caf50 ${rP}%,
+                        #eee 0
+                    );
+                    ">
+
+                    ${rP}%
+
+                </div>
+
                 Real
+
             </div>
+
             <div class="result-item">
-                <div class="circle">${aP}%</div>
+
+                <div
+                    class="circle"
+
+                    style="
+                    background:
+                    conic-gradient(
+                        #f44336 ${aP}%,
+                        #eee 0
+                    );
+                    ">
+
+                    ${aP}%
+
+                </div>
+
                 AI
+
             </div>
+
         </div>
-        `;
+    `;
 
-        bubble.classList.add('voted');
-        attachCloseEvent();
-    }
+    bubble.classList.add('voted');
 
-    function sendVote(cleanUrl, voteType) {
-        chrome.runtime.sendMessage({
-            action: "fetchData",
-            url: `${SERVER_URL}/vote`,
-            method: "POST",
-            body: { url: cleanUrl, voteType }
-        });
-    }
+    attachCloseEvent(bubble);
 }
 
 const observer = new MutationObserver((mutations) => {
+
     mutations.forEach(m =>
+
         m.addedNodes.forEach(node => {
+
             if (node.nodeType === 1) {
-                if (node.tagName === 'IMG') injectTrustTool(node);
-                node.querySelectorAll('img').forEach(injectTrustTool);
+
+                if (node.tagName === 'IMG') {
+                    injectTrustTool(node);
+                }
+
+                node.querySelectorAll('img')
+                    .forEach(injectTrustTool);
             }
         })
     );
 });
 
-observer.observe(document.body, { childList: true, subtree: true });
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
