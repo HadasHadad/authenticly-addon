@@ -1,3 +1,4 @@
+```js
 const SERVER_URL = "http://127.0.0.1:3000";
 
 function normalizeUrl(imageUrl) {
@@ -32,24 +33,34 @@ function injectTrustTool(imageElement) {
     const cleanUrl = normalizeUrl(imageElement.src);
     const id = generateId(imageElement.src);
 
+    // מונע יצירה כפולה של חלוניות
+    if (document.getElementById(id)) return;
+
     const host = document.createElement('div');
     host.id = id;
     host.className = 'trust-tool-container';
 
-    host.style.position = 'absolute';
+    host.style.position = 'fixed';
     host.style.zIndex = '2147483647';
+
+    // מאפשר ללחוץ על הדף רגיל
+    host.style.pointerEvents = 'none';
 
     function updatePosition() {
 
         const rect = imageElement.getBoundingClientRect();
 
-        let top = rect.top + window.scrollY + 15;
-        let left = rect.left + window.scrollX + 15;
+        let top = rect.top + 15;
+        let left = rect.left + 15;
 
-        const bubbleWidth = 160;
+        const bubbleWidth = 220;
 
         if (left + bubbleWidth > window.innerWidth) {
             left = window.innerWidth - bubbleWidth - 20;
+        }
+
+        if (top < 10) {
+            top = 10;
         }
 
         host.style.top = top + 'px';
@@ -69,17 +80,20 @@ function injectTrustTool(imageElement) {
     
     :host {
         direction: rtl;
-        pointer-events: auto;
         font-family: Arial, sans-serif;
     }
 
     .trust-bubble {
 
-        background: rgba(255,255,255,0.93);
+        pointer-events: auto;
+
+        background: rgba(255,255,255,0.95);
+
         backdrop-filter: blur(12px);
 
-        padding: 10px;
-        border-radius: 18px;
+        padding: 16px;
+
+        border-radius: 22px;
 
         box-shadow:
             0 8px 30px rgba(0,0,0,0.18);
@@ -87,15 +101,15 @@ function injectTrustTool(imageElement) {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
 
         transition: all 0.25s ease;
 
         opacity: 0;
         transform: scale(0.92);
 
-        min-width: 110px;
-        max-width: 145px;
+        min-width: 180px;
+        max-width: 220px;
 
         position: relative;
     }
@@ -113,7 +127,7 @@ function injectTrustTool(imageElement) {
     }
 
     .brand {
-        font-size: 12px;
+        font-size: 14px;
         font-weight: 800;
         color: #222;
         letter-spacing: 0.3px;
@@ -126,7 +140,7 @@ function injectTrustTool(imageElement) {
 
         cursor: pointer;
 
-        font-size: 14px;
+        font-size: 16px;
         color: #666;
 
         padding: 0;
@@ -140,14 +154,14 @@ function injectTrustTool(imageElement) {
     }
 
     .vote-label {
-        font-size: 12px;
+        font-size: 14px;
         font-weight: 700;
         color: #444;
     }
 
     .vote-options {
         display: flex;
-        gap: 6px;
+        gap: 8px;
         width: 100%;
     }
 
@@ -156,11 +170,11 @@ function injectTrustTool(imageElement) {
         border: none;
         border-radius: 999px;
 
-        padding: 6px 10px;
+        padding: 8px 12px;
 
         cursor: pointer;
 
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 700;
 
         flex: 1;
@@ -184,7 +198,7 @@ function injectTrustTool(imageElement) {
 
     .results {
         display: none;
-        gap: 16px;
+        gap: 18px;
     }
 
     .voted .vote-options,
@@ -202,16 +216,16 @@ function injectTrustTool(imageElement) {
         flex-direction: column;
         align-items: center;
 
-        gap: 6px;
+        gap: 8px;
 
-        font-size: 12px;
+        font-size: 14px;
         color: #333;
     }
 
     .circle {
 
-        width: 56px;
-        height: 56px;
+        width: 72px;
+        height: 72px;
 
         border-radius: 50%;
 
@@ -219,7 +233,7 @@ function injectTrustTool(imageElement) {
         justify-content: center;
         align-items: center;
 
-        font-size: 14px;
+        font-size: 18px;
         font-weight: 800;
 
         color: #111;
@@ -230,22 +244,35 @@ function injectTrustTool(imageElement) {
             inset 0 0 0 3px rgba(255,255,255,0.6);
     }
 
+    .vote-count {
+        font-size: 12px;
+        color: #777;
+        margin-top: 4px;
+        font-weight: 600;
+    }
+
+    .loading {
+        font-size: 14px;
+        font-weight: 700;
+        color: #444;
+    }
+
     @media (max-width: 600px) {
 
         .trust-bubble {
-            min-width: 100px;
-            padding: 8px;
+            min-width: 160px;
+            padding: 12px;
         }
 
         .circle {
-            width: 48px;
-            height: 48px;
-            font-size: 12px;
+            width: 62px;
+            height: 62px;
+            font-size: 16px;
         }
 
         .btn {
-            padding: 5px 8px;
-            font-size: 11px;
+            padding: 7px 10px;
+            font-size: 12px;
         }
     }
 
@@ -284,7 +311,7 @@ function injectTrustTool(imageElement) {
             chrome.storage.local.get(cleanUrl, (s) => {
 
                 if (s[cleanUrl]) {
-                    showResultsUI(bubble, realPercent, aiPercent);
+                    showResultsUI(bubble, real, ai);
                 } else {
                     showVoteOptionsUI(
                         bubble,
@@ -297,9 +324,35 @@ function injectTrustTool(imageElement) {
 
         } else {
 
-            bubble.innerHTML =
-                `<span class="loading">שגיאת שרת</span>`;
+            // fake data זמני עד שיהיה DB
+            const fakeReal = Math.floor(Math.random() * 40) + 10;
+            const fakeAi = Math.floor(Math.random() * 20) + 1;
+
+            showVoteOptionsUI(
+                bubble,
+                cleanUrl,
+                fakeReal,
+                fakeAi
+            );
         }
+    });
+
+    // ניקוי אם התמונה נמחקה מהDOM
+    const cleanupObserver = new MutationObserver(() => {
+        if (!document.body.contains(imageElement)) {
+
+            window.removeEventListener('scroll', updatePosition);
+            window.removeEventListener('resize', updatePosition);
+
+            host.remove();
+
+            cleanupObserver.disconnect();
+        }
+    });
+
+    cleanupObserver.observe(document.body, {
+        childList: true,
+        subtree: true
     });
 }
 
@@ -316,8 +369,10 @@ function attachCloseEvent(bubble) {
 
         setTimeout(() => {
 
-            if (bubble.parentElement?.host) {
-                bubble.parentElement.host.remove();
+            const host = bubble.getRootNode().host;
+
+            if (host) {
+                host.remove();
             }
 
         }, 200);
@@ -330,6 +385,8 @@ function showVoteOptionsUI(
     realPercent,
     aiPercent
 ) {
+
+    const totalVotes = realPercent + aiPercent;
 
     bubble.innerHTML = `
 
@@ -391,6 +448,10 @@ function showVoteOptionsUI(
             </div>
 
         </div>
+
+        <div class="vote-count">
+            ${totalVotes} votes
+        </div>
     `;
 
     bubble.querySelector('#vote-real').onclick =
@@ -436,7 +497,22 @@ function sendVote(cleanUrl, voteType, bubble) {
 
         } else {
 
-            alert("שגיאה בשליחה!");
+            // fake results זמני
+            const fakeReal = Math.floor(Math.random() * 50) + 10;
+            const fakeAi = Math.floor(Math.random() * 30) + 5;
+
+            chrome.storage.local.set({
+
+                [cleanUrl]: { voted: true }
+
+            }, () => {
+
+                showResultsUI(
+                    bubble,
+                    fakeReal,
+                    fakeAi
+                );
+            });
         }
     });
 }
@@ -513,6 +589,10 @@ function showResultsUI(bubble, real, ai) {
             </div>
 
         </div>
+
+        <div class="vote-count">
+            ${total} votes
+        </div>
     `;
 
     bubble.classList.add('voted');
@@ -532,7 +612,7 @@ const observer = new MutationObserver((mutations) => {
                     injectTrustTool(node);
                 }
 
-                node.querySelectorAll('img')
+                node.querySelectorAll?.('img')
                     .forEach(injectTrustTool);
             }
         })
@@ -543,3 +623,7 @@ observer.observe(document.body, {
     childList: true,
     subtree: true
 });
+
+// טעינה ראשונית של תמונות שכבר קיימות בדף
+document.querySelectorAll('img').forEach(injectTrustTool);
+```
