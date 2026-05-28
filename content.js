@@ -1,6 +1,7 @@
 const SERVER_URL = "http://127.0.0.1:3000";
 
 let activeHost = null;
+let positionHandler = null;
 
 /* ---------------- URL ---------------- */
 function normalizeUrl(url) {
@@ -19,11 +20,20 @@ function isValid(img) {
 
 /* ---------------- CLOSE ---------------- */
 function closeBox() {
-    if (activeHost) activeHost.remove();
-    activeHost = null;
+
+    if (activeHost) {
+        activeHost.remove();
+        activeHost = null;
+    }
+
+    if (positionHandler) {
+        window.removeEventListener("scroll", positionHandler);
+        window.removeEventListener("resize", positionHandler);
+        positionHandler = null;
+    }
 }
 
-/* ---------------- OPEN BOX ---------------- */
+/* ---------------- OPEN ---------------- */
 function openBox(img) {
 
     if (!isValid(img)) return;
@@ -111,19 +121,20 @@ function openBox(img) {
 
     activeHost = host;
 
-    position();
-
-    window.addEventListener("scroll", position);
-    window.addEventListener("resize", position);
-
-    renderVote();
-
-    /* ---------------- POSITION ---------------- */
+    /* ---------------- POSITION (SAFE SINGLE HANDLER) ---------------- */
     function position() {
         const r = img.getBoundingClientRect();
         host.style.top = window.scrollY + r.top + 10 + "px";
         host.style.left = window.scrollX + r.left + 10 + "px";
     }
+
+    position();
+
+    positionHandler = position;
+    window.addEventListener("scroll", positionHandler);
+    window.addEventListener("resize", positionHandler);
+
+    renderVote();
 
     /* ---------------- VOTE UI ---------------- */
     function renderVote() {
@@ -196,7 +207,7 @@ function openBox(img) {
     }
 }
 
-/* ---------------- CLICK TRIGGER ---------------- */
+/* ---------------- CLICK ---------------- */
 document.addEventListener("click", (e) => {
     const img = e.target.closest("img");
     if (!img) return;
