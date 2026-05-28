@@ -1,6 +1,7 @@
 const SERVER_URL = "http://127.0.0.1:3000";
 
-const injectedMap = new WeakMap();
+/* ------------------ ANTI DUPLICATE GLOBAL LOCK ------------------ */
+const processedImages = new WeakSet();
 
 /* ------------------ URL ------------------ */
 function normalizeUrl(imageUrl) {
@@ -15,6 +16,7 @@ function normalizeUrl(imageUrl) {
 /* ------------------ VALID ------------------ */
 function isValidImage(img) {
     return (
+        img &&
         img.src &&
         img.src.startsWith('http') &&
         img.naturalWidth > 150 &&
@@ -27,7 +29,11 @@ function injectTrustTool(img) {
 
     if (!isValidImage(img)) return;
 
+    /* 🔥 HARD LOCK: prevents duplicates completely */
     if (img.dataset.injected === "1") return;
+    if (processedImages.has(img)) return;
+
+    processedImages.add(img);
     img.dataset.injected = "1";
 
     const cleanUrl = normalizeUrl(img.src);
@@ -42,12 +48,9 @@ function injectTrustTool(img) {
     const style = document.createElement('style');
 
     style.textContent = `
-        .box {
+        .bubble {
             font-family: Arial;
             direction: rtl;
-        }
-
-        .bubble {
             pointer-events: auto;
             background: white;
             border-radius: 16px;
@@ -98,6 +101,7 @@ function injectTrustTool(img) {
             display:none;
             margin-top:10px;
             gap:10px;
+            justify-content:center;
         }
 
         .circle {
@@ -122,6 +126,7 @@ function injectTrustTool(img) {
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
+    bubble.innerHTML = `<span>Loading...</span>`;
 
     shadow.appendChild(style);
     shadow.appendChild(bubble);
@@ -210,7 +215,7 @@ function injectTrustTool(img) {
                 <div class="circle" style="background:#ffd0dc">${a}%</div>
             </div>
 
-            <div>${total} votes</div>
+            <div style="margin-top:8px">${total} votes</div>
         `;
 
         bubble.querySelector('.x').onclick =
