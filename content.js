@@ -1,4 +1,3 @@
-```js
 const SERVER_URL = "http://127.0.0.1:3000";
 
 function normalizeUrl(imageUrl) {
@@ -25,13 +24,9 @@ function isValidImage(img) {
 
 function injectTrustTool(imageElement) {
 
-    if (!imageElement) return;
-
     if (imageElement.src.startsWith('data:')) return;
 
-    if (!isValidImage(imageElement)) return;
-
-    if (imageElement.dataset.trustInjected) return;
+    if (!isValidImage(imageElement) || imageElement.dataset.trustInjected) return;
 
     imageElement.dataset.trustInjected = "true";
 
@@ -39,7 +34,7 @@ function injectTrustTool(imageElement) {
 
     const id = generateId(imageElement.src);
 
-    // מונע יצירת חלוניות כפולות
+    // מונע כפילויות
     if (document.getElementById(id)) return;
 
     const host = document.createElement('div');
@@ -48,7 +43,7 @@ function injectTrustTool(imageElement) {
 
     host.className = 'trust-tool-container';
 
-    host.style.position = 'fixed';
+    host.style.position = 'absolute';
 
     host.style.zIndex = '2147483647';
 
@@ -59,18 +54,15 @@ function injectTrustTool(imageElement) {
 
         const rect = imageElement.getBoundingClientRect();
 
-        let top = rect.top + 15;
+        let top = rect.top + window.scrollY + 15;
 
-        let left = rect.left + 15;
+        let left = rect.left + window.scrollX + 15;
 
         const bubbleWidth = 220;
 
         if (left + bubbleWidth > window.innerWidth) {
-            left = window.innerWidth - bubbleWidth - 20;
-        }
 
-        if (top < 10) {
-            top = 10;
+            left = window.innerWidth - bubbleWidth - 20;
         }
 
         host.style.top = top + 'px';
@@ -92,6 +84,7 @@ function injectTrustTool(imageElement) {
 
     :host {
         direction: rtl;
+        pointer-events: auto;
         font-family: Arial, sans-serif;
     }
 
@@ -112,19 +105,15 @@ function injectTrustTool(imageElement) {
 
         display: flex;
         flex-direction: column;
-
         align-items: center;
-
         gap: 12px;
 
         transition: all 0.25s ease;
 
         opacity: 0;
-
         transform: scale(0.92);
 
         min-width: 180px;
-
         max-width: 220px;
 
         position: relative;
@@ -233,9 +222,7 @@ function injectTrustTool(imageElement) {
     }
 
     .results {
-
         display: none;
-
         gap: 18px;
     }
 
@@ -251,34 +238,27 @@ function injectTrustTool(imageElement) {
     .result-item {
 
         display: flex;
-
         flex-direction: column;
-
         align-items: center;
 
         gap: 8px;
 
         font-size: 14px;
-
         color: #333;
     }
 
     .circle {
 
         width: 72px;
-
         height: 72px;
 
         border-radius: 50%;
 
         display: flex;
-
         justify-content: center;
-
         align-items: center;
 
         font-size: 18px;
-
         font-weight: 800;
 
         color: #111;
@@ -292,21 +272,9 @@ function injectTrustTool(imageElement) {
     .vote-count {
 
         font-size: 12px;
-
         color: #777;
-
         margin-top: 4px;
-
         font-weight: 600;
-    }
-
-    .loading {
-
-        font-size: 14px;
-
-        font-weight: 700;
-
-        color: #444;
     }
 
     @media (max-width: 600px) {
@@ -314,26 +282,23 @@ function injectTrustTool(imageElement) {
         .trust-bubble {
 
             min-width: 160px;
-
             padding: 12px;
         }
 
         .circle {
 
-            width: 62px;
-
-            height: 62px;
-
-            font-size: 16px;
+            width: 60px;
+            height: 60px;
+            font-size: 15px;
         }
 
         .btn {
 
-            padding: 7px 10px;
-
+            padding: 6px 10px;
             font-size: 12px;
         }
     }
+
     `;
 
     const bubble = document.createElement('div');
@@ -348,11 +313,7 @@ function injectTrustTool(imageElement) {
 
     document.body.appendChild(host);
 
-    setTimeout(() => {
-
-        bubble.classList.add('visible');
-
-    }, 50);
+    setTimeout(() => bubble.classList.add('visible'), 50);
 
     chrome.runtime.sendMessage({
 
@@ -364,9 +325,16 @@ function injectTrustTool(imageElement) {
 
         if (response && response.data) {
 
-            const real = response.data.real || 0;
+            const { real, ai } = response.data;
 
-            const ai = response.data.ai || 0;
+            const total = real + ai;
+
+            const realPercent =
+                total > 0
+                    ? Math.round((real / total) * 100)
+                    : 0;
+
+            const aiPercent = 100 - realPercent;
 
             chrome.storage.local.get(cleanUrl, (s) => {
 
@@ -382,39 +350,18 @@ function injectTrustTool(imageElement) {
 
                     showVoteOptionsUI(
                         bubble,
-                        cleanUrl
+                        cleanUrl,
+                        realPercent,
+                        aiPercent
                     );
                 }
             });
 
         } else {
 
-            // fake data זמני
-            showVoteOptionsUI(
-                bubble,
-                cleanUrl
-            );
+            bubble.innerHTML =
+                `<span class="loading">שגיאת שרת</span>`;
         }
-    });
-
-    // אם התמונה נעלמת - מנקה
-    const cleanupObserver = new MutationObserver(() => {
-
-        if (!document.body.contains(imageElement)) {
-
-            window.removeEventListener('scroll', updatePosition);
-
-            window.removeEventListener('resize', updatePosition);
-
-            host.remove();
-
-            cleanupObserver.disconnect();
-        }
-    });
-
-    cleanupObserver.observe(document.body, {
-        childList: true,
-        subtree: true
     });
 }
 
@@ -445,7 +392,9 @@ function attachCloseEvent(bubble) {
 
 function showVoteOptionsUI(
     bubble,
-    cleanUrl
+    cleanUrl,
+    realPercent,
+    aiPercent
 ) {
 
     bubble.innerHTML = `
@@ -513,53 +462,38 @@ function sendVote(cleanUrl, voteType, bubble) {
 
     }, (response) => {
 
-        let real = 0;
-
-        let ai = 0;
-
         if (response && response.data) {
 
-            real = response.data.real || 0;
+            chrome.storage.local.set({
 
-            ai = response.data.ai || 0;
+                [cleanUrl]: { voted: true }
+
+            }, () => {
+
+                showResultsUI(
+                    bubble,
+                    response.data.real,
+                    response.data.ai
+                );
+            });
 
         } else {
 
-            // fake data זמני
-            real = Math.floor(Math.random() * 50) + 10;
-
-            ai = Math.floor(Math.random() * 30) + 5;
+            alert("שגיאה בשליחה!");
         }
-
-        chrome.storage.local.set({
-
-            [cleanUrl]: { voted: true }
-
-        }, () => {
-
-            showResultsUI(
-                bubble,
-                real,
-                ai
-            );
-        });
     });
 }
 
-function showResultsUI(
-    bubble,
-    real,
-    ai
-) {
+function showResultsUI(bubble, real, ai) {
 
     const total = real + ai;
 
-    const realPercent =
+    const rP =
         total > 0
             ? Math.round((real / total) * 100)
             : 0;
 
-    const aiPercent = 100 - realPercent;
+    const aP = 100 - rP;
 
     bubble.innerHTML = `
 
@@ -587,12 +521,12 @@ function showResultsUI(
                     style="
                     background:
                     conic-gradient(
-                        #4caf50 ${realPercent}%,
+                        #4caf50 ${rP}%,
                         #eee 0
                     );
                     ">
 
-                    ${realPercent}%
+                    ${rP}%
 
                 </div>
 
@@ -608,12 +542,12 @@ function showResultsUI(
                     style="
                     background:
                     conic-gradient(
-                        #f44336 ${aiPercent}%,
+                        #f44336 ${aP}%,
                         #eee 0
                     );
                     ">
 
-                    ${aiPercent}%
+                    ${aP}%
 
                 </div>
 
@@ -664,8 +598,3 @@ observer.observe(document.body, {
 
     subtree: true
 });
-
-// טעינה ראשונית
-document.querySelectorAll('img')
-    .forEach(injectTrustTool);
-```
