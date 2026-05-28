@@ -25,25 +25,34 @@ function isValidImage(img) {
 
 function injectTrustTool(imageElement) {
 
+    if (!imageElement) return;
+
     if (imageElement.src.startsWith('data:')) return;
-    if (!isValidImage(imageElement) || imageElement.dataset.trustInjected) return;
+
+    if (!isValidImage(imageElement)) return;
+
+    if (imageElement.dataset.trustInjected) return;
 
     imageElement.dataset.trustInjected = "true";
 
     const cleanUrl = normalizeUrl(imageElement.src);
+
     const id = generateId(imageElement.src);
 
-    // מונע יצירה כפולה של חלוניות
+    // מונע יצירת חלוניות כפולות
     if (document.getElementById(id)) return;
 
     const host = document.createElement('div');
+
     host.id = id;
+
     host.className = 'trust-tool-container';
 
     host.style.position = 'fixed';
+
     host.style.zIndex = '2147483647';
 
-    // מאפשר ללחוץ על הדף רגיל
+    // לא חוסם קליקים על הדף
     host.style.pointerEvents = 'none';
 
     function updatePosition() {
@@ -51,6 +60,7 @@ function injectTrustTool(imageElement) {
         const rect = imageElement.getBoundingClientRect();
 
         let top = rect.top + 15;
+
         let left = rect.left + 15;
 
         const bubbleWidth = 220;
@@ -64,12 +74,14 @@ function injectTrustTool(imageElement) {
         }
 
         host.style.top = top + 'px';
+
         host.style.left = left + 'px';
     }
 
     updatePosition();
 
     window.addEventListener('scroll', updatePosition);
+
     window.addEventListener('resize', updatePosition);
 
     const shadow = host.attachShadow({ mode: 'open' });
@@ -77,7 +89,7 @@ function injectTrustTool(imageElement) {
     const style = document.createElement('style');
 
     style.textContent = `
-    
+
     :host {
         direction: rtl;
         font-family: Arial, sans-serif;
@@ -100,15 +112,19 @@ function injectTrustTool(imageElement) {
 
         display: flex;
         flex-direction: column;
+
         align-items: center;
+
         gap: 12px;
 
         transition: all 0.25s ease;
 
         opacity: 0;
+
         transform: scale(0.92);
 
         min-width: 180px;
+
         max-width: 220px;
 
         position: relative;
@@ -120,27 +136,37 @@ function injectTrustTool(imageElement) {
     }
 
     .top-bar {
+
         width: 100%;
+
         display: flex;
+
         justify-content: space-between;
+
         align-items: center;
     }
 
     .brand {
+
         font-size: 14px;
+
         font-weight: 800;
+
         color: #222;
+
         letter-spacing: 0.3px;
     }
 
     .close-btn {
 
         border: none;
+
         background: transparent;
 
         cursor: pointer;
 
         font-size: 16px;
+
         color: #666;
 
         padding: 0;
@@ -149,25 +175,34 @@ function injectTrustTool(imageElement) {
     }
 
     .close-btn:hover {
+
         color: #111;
+
         transform: scale(1.1);
     }
 
     .vote-label {
+
         font-size: 14px;
+
         font-weight: 700;
+
         color: #444;
     }
 
     .vote-options {
+
         display: flex;
+
         gap: 8px;
+
         width: 100%;
     }
 
     .btn {
 
         border: none;
+
         border-radius: 999px;
 
         padding: 8px 12px;
@@ -175,6 +210,7 @@ function injectTrustTool(imageElement) {
         cursor: pointer;
 
         font-size: 13px;
+
         font-weight: 700;
 
         flex: 1;
@@ -197,7 +233,9 @@ function injectTrustTool(imageElement) {
     }
 
     .results {
+
         display: none;
+
         gap: 18px;
     }
 
@@ -213,27 +251,34 @@ function injectTrustTool(imageElement) {
     .result-item {
 
         display: flex;
+
         flex-direction: column;
+
         align-items: center;
 
         gap: 8px;
 
         font-size: 14px;
+
         color: #333;
     }
 
     .circle {
 
         width: 72px;
+
         height: 72px;
 
         border-radius: 50%;
 
         display: flex;
+
         justify-content: center;
+
         align-items: center;
 
         font-size: 18px;
+
         font-weight: 800;
 
         color: #111;
@@ -245,103 +290,120 @@ function injectTrustTool(imageElement) {
     }
 
     .vote-count {
+
         font-size: 12px;
+
         color: #777;
+
         margin-top: 4px;
+
         font-weight: 600;
     }
 
     .loading {
+
         font-size: 14px;
+
         font-weight: 700;
+
         color: #444;
     }
 
     @media (max-width: 600px) {
 
         .trust-bubble {
+
             min-width: 160px;
+
             padding: 12px;
         }
 
         .circle {
+
             width: 62px;
+
             height: 62px;
+
             font-size: 16px;
         }
 
         .btn {
+
             padding: 7px 10px;
+
             font-size: 12px;
         }
     }
-
     `;
 
     const bubble = document.createElement('div');
+
     bubble.className = 'trust-bubble';
 
     bubble.innerHTML = `<span class="loading">טוען...</span>`;
 
     shadow.appendChild(style);
+
     shadow.appendChild(bubble);
 
     document.body.appendChild(host);
 
-    setTimeout(() => bubble.classList.add('visible'), 50);
+    setTimeout(() => {
+
+        bubble.classList.add('visible');
+
+    }, 50);
 
     chrome.runtime.sendMessage({
+
         action: "fetchData",
+
         url: `${SERVER_URL}/front?url=${encodeURIComponent(cleanUrl)}`
+
     }, (response) => {
 
         if (response && response.data) {
 
-            const { real, ai } = response.data;
+            const real = response.data.real || 0;
 
-            const total = real + ai;
-
-            const realPercent =
-                total > 0
-                    ? Math.round((real / total) * 100)
-                    : 0;
-
-            const aiPercent = 100 - realPercent;
+            const ai = response.data.ai || 0;
 
             chrome.storage.local.get(cleanUrl, (s) => {
 
                 if (s[cleanUrl]) {
-                    showResultsUI(bubble, real, ai);
+
+                    showResultsUI(
+                        bubble,
+                        real,
+                        ai
+                    );
+
                 } else {
+
                     showVoteOptionsUI(
                         bubble,
-                        cleanUrl,
-                        realPercent,
-                        aiPercent
+                        cleanUrl
                     );
                 }
             });
 
         } else {
 
-            // fake data זמני עד שיהיה DB
-            const fakeReal = Math.floor(Math.random() * 40) + 10;
-            const fakeAi = Math.floor(Math.random() * 20) + 1;
-
+            // fake data זמני
             showVoteOptionsUI(
                 bubble,
-                cleanUrl,
-                fakeReal,
-                fakeAi
+                cleanUrl
             );
         }
     });
 
-    // ניקוי אם התמונה נמחקה מהDOM
+    // אם התמונה נעלמת - מנקה
     const cleanupObserver = new MutationObserver(() => {
+
         if (!document.body.contains(imageElement)) {
 
             window.removeEventListener('scroll', updatePosition);
+
             window.removeEventListener('resize', updatePosition);
 
             host.remove();
@@ -365,14 +427,16 @@ function attachCloseEvent(bubble) {
     closeBtn.onclick = () => {
 
         bubble.style.opacity = '0';
+
         bubble.style.transform = 'scale(0.8)';
 
         setTimeout(() => {
 
-            const host = bubble.getRootNode().host;
+            const shadowRoot = bubble.parentNode;
 
-            if (host) {
-                host.remove();
+            if (shadowRoot && shadowRoot.host) {
+
+                shadowRoot.host.remove();
             }
 
         }, 200);
@@ -381,21 +445,26 @@ function attachCloseEvent(bubble) {
 
 function showVoteOptionsUI(
     bubble,
-    cleanUrl,
-    realPercent,
-    aiPercent
+    cleanUrl
 ) {
-
-    const totalVotes = realPercent + aiPercent;
 
     bubble.innerHTML = `
 
         <div class="top-bar">
-            <span class="brand">Authenticly</span>
-            <button class="close-btn">✕</button>
+
+            <span class="brand">
+                Authenticly
+            </span>
+
+            <button class="close-btn">
+                ✕
+            </button>
+
         </div>
 
-        <span class="vote-label">אמיתי או AI?</span>
+        <span class="vote-label">
+            אמיתי או AI?
+        </span>
 
         <div class="vote-options">
 
@@ -415,42 +484,6 @@ function showVoteOptionsUI(
 
             </button>
 
-        </div>
-
-        <div class="results">
-
-            <div class="result-item">
-
-                <div
-                    class="circle"
-                    id="c-real">
-
-                    ${realPercent}%
-
-                </div>
-
-                Real
-
-            </div>
-
-            <div class="result-item">
-
-                <div
-                    class="circle"
-                    id="c-ai">
-
-                    ${aiPercent}%
-
-                </div>
-
-                AI
-
-            </div>
-
-        </div>
-
-        <div class="vote-count">
-            ${totalVotes} votes
         </div>
     `;
 
@@ -480,53 +513,53 @@ function sendVote(cleanUrl, voteType, bubble) {
 
     }, (response) => {
 
+        let real = 0;
+
+        let ai = 0;
+
         if (response && response.data) {
 
-            chrome.storage.local.set({
+            real = response.data.real || 0;
 
-                [cleanUrl]: { voted: true }
-
-            }, () => {
-
-                showResultsUI(
-                    bubble,
-                    response.data.real,
-                    response.data.ai
-                );
-            });
+            ai = response.data.ai || 0;
 
         } else {
 
-            // fake results זמני
-            const fakeReal = Math.floor(Math.random() * 50) + 10;
-            const fakeAi = Math.floor(Math.random() * 30) + 5;
+            // fake data זמני
+            real = Math.floor(Math.random() * 50) + 10;
 
-            chrome.storage.local.set({
-
-                [cleanUrl]: { voted: true }
-
-            }, () => {
-
-                showResultsUI(
-                    bubble,
-                    fakeReal,
-                    fakeAi
-                );
-            });
+            ai = Math.floor(Math.random() * 30) + 5;
         }
+
+        chrome.storage.local.set({
+
+            [cleanUrl]: { voted: true }
+
+        }, () => {
+
+            showResultsUI(
+                bubble,
+                real,
+                ai
+            );
+        });
     });
 }
 
-function showResultsUI(bubble, real, ai) {
+function showResultsUI(
+    bubble,
+    real,
+    ai
+) {
 
     const total = real + ai;
 
-    const rP =
+    const realPercent =
         total > 0
             ? Math.round((real / total) * 100)
             : 0;
 
-    const aP = 100 - rP;
+    const aiPercent = 100 - realPercent;
 
     bubble.innerHTML = `
 
@@ -554,12 +587,12 @@ function showResultsUI(bubble, real, ai) {
                     style="
                     background:
                     conic-gradient(
-                        #4caf50 ${rP}%,
+                        #4caf50 ${realPercent}%,
                         #eee 0
                     );
                     ">
 
-                    ${rP}%
+                    ${realPercent}%
 
                 </div>
 
@@ -575,12 +608,12 @@ function showResultsUI(bubble, real, ai) {
                     style="
                     background:
                     conic-gradient(
-                        #f44336 ${aP}%,
+                        #f44336 ${aiPercent}%,
                         #eee 0
                     );
                     ">
 
-                    ${aP}%
+                    ${aiPercent}%
 
                 </div>
 
@@ -591,7 +624,9 @@ function showResultsUI(bubble, real, ai) {
         </div>
 
         <div class="vote-count">
+
             ${total} votes
+
         </div>
     `;
 
@@ -609,21 +644,28 @@ const observer = new MutationObserver((mutations) => {
             if (node.nodeType === 1) {
 
                 if (node.tagName === 'IMG') {
+
                     injectTrustTool(node);
                 }
 
-                node.querySelectorAll?.('img')
-                    .forEach(injectTrustTool);
+                if (node.querySelectorAll) {
+
+                    node.querySelectorAll('img')
+                        .forEach(injectTrustTool);
+                }
             }
         })
     );
 });
 
 observer.observe(document.body, {
+
     childList: true,
+
     subtree: true
 });
 
-// טעינה ראשונית של תמונות שכבר קיימות בדף
-document.querySelectorAll('img').forEach(injectTrustTool);
+// טעינה ראשונית
+document.querySelectorAll('img')
+    .forEach(injectTrustTool);
 ```
