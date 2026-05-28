@@ -1,64 +1,72 @@
 const SERVER_URL = "http://127.0.0.1:3000";
 
-let currentHost = null;
-let currentImg = null;
+let activeHost = null;
 
 /* ---------------- URL ---------------- */
-function normalizeUrl(u) {
+function normalizeUrl(url) {
     try {
-        const url = new URL(u);
-        return url.origin + url.pathname;
+        const u = new URL(url);
+        return u.origin + u.pathname;
     } catch {
-        return u;
+        return url;
     }
 }
 
 /* ---------------- VALID IMAGE ---------------- */
 function isValid(img) {
-    return img && img.src && img.naturalWidth > 150;
+    return img && img.tagName === "IMG" && img.src && img.naturalWidth > 100;
 }
 
-/* ---------------- OPEN OVERLAY ---------------- */
+/* ---------------- CLOSE ---------------- */
+function closeBox() {
+    if (activeHost) activeHost.remove();
+    activeHost = null;
+}
+
+/* ---------------- OPEN BOX ---------------- */
 function openBox(img) {
 
     if (!isValid(img)) return;
 
+    closeBox();
+
     const url = normalizeUrl(img.src);
 
-    closeBox(); // חשוב: סוגר קודם כל חלון פתוח
+    const host = document.createElement("div");
+    host.style.position = "absolute";
+    host.style.zIndex = "999999999";
+    host.style.pointerEvents = "none";
 
-    currentImg = img;
+    const shadow = host.attachShadow({ mode: "open" });
 
-    const host = document.createElement('div');
-    host.style.position = 'absolute';
-    host.style.zIndex = 999999999;
-    host.style.pointerEvents = 'none';
-
-    const shadow = host.attachShadow({ mode: 'open' });
-
-    const style = document.createElement('style');
-
+    const style = document.createElement("style");
     style.textContent = `
         .box {
             font-family: Arial;
             direction: rtl;
-            pointer-events:auto;
-            background:white;
-            padding:14px;
-            border-radius:16px;
-            width:200px;
-            box-shadow:0 10px 30px rgba(0,0,0,0.2);
+            background: white;
+            border-radius: 14px;
+            padding: 12px;
+            width: 200px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            pointer-events: auto;
         }
 
         .top {
             display:flex;
             justify-content:space-between;
+            margin-bottom:8px;
+        }
+
+        .x {
+            cursor:pointer;
+            border:none;
+            background:transparent;
         }
 
         .btns {
             display:flex;
             gap:8px;
-            margin-top:10px;
         }
 
         .btn {
@@ -73,6 +81,12 @@ function openBox(img) {
         .real { background:#d4f5dd; }
         .ai { background:#ffd6e0; }
 
+        .results {
+            display:none;
+            margin-top:10px;
+            gap:10px;
+        }
+
         .circle {
             width:60px;
             height:60px;
@@ -84,31 +98,37 @@ function openBox(img) {
             font-weight:bold;
         }
 
-        .results { display:none; gap:10px; margin-top:10px; }
-
         .voted .btns { display:none; }
         .voted .results { display:flex; }
     `;
 
-    const box = document.createElement('div');
-    box.className = 'box';
+    const box = document.createElement("div");
+    box.className = "box";
 
     shadow.appendChild(style);
     shadow.appendChild(box);
     document.body.appendChild(host);
 
-    currentHost = host;
+    activeHost = host;
 
     position();
 
-    window.addEventListener('scroll', position);
-    window.addEventListener('resize', position);
+    window.addEventListener("scroll", position);
+    window.addEventListener("resize", position);
 
-    /* -------- UI: VOTE -------- */
     renderVote();
 
+    /* ---------------- POSITION ---------------- */
+    function position() {
+        const r = img.getBoundingClientRect();
+        host.style.top = window.scrollY + r.top + 10 + "px";
+        host.style.left = window.scrollX + r.left + 10 + "px";
+    }
+
+    /* ---------------- VOTE UI ---------------- */
     function renderVote() {
-        box.classList.remove('voted');
+
+        box.classList.remove("voted");
 
         box.innerHTML = `
             <div class="top">
@@ -124,19 +144,19 @@ function openBox(img) {
             </div>
         `;
 
-        box.querySelector('.real').onclick = () => vote('real');
-        box.querySelector('.ai').onclick = () => vote('ai');
-        box.querySelector('.x').onclick = closeBox;
+        box.querySelector(".real").onclick = () => vote("real");
+        box.querySelector(".ai").onclick = () => vote("ai");
+        box.querySelector(".x").onclick = closeBox;
     }
 
-    /* -------- UI: RESULTS -------- */
+    /* ---------------- RESULTS ---------------- */
     function renderResults(real, ai) {
 
         const total = real + ai || 1;
-        const r = Math.round(real / total * 100);
+        const r = Math.round((real / total) * 100);
         const a = 100 - r;
 
-        box.classList.add('voted');
+        box.classList.add("voted");
 
         box.innerHTML = `
             <div class="top">
@@ -149,13 +169,15 @@ function openBox(img) {
                 <div class="circle">${a}%</div>
             </div>
 
-            <div>${total} votes</div>
+            <div style="margin-top:8px;font-size:12px;">
+                ${total} votes
+            </div>
         `;
 
-        box.querySelector('.x').onclick = closeBox;
+        box.querySelector(".x").onclick = closeBox;
     }
 
-    /* -------- VOTE -------- */
+    /* ---------------- VOTE ---------------- */
     function vote(type) {
 
         chrome.runtime.sendMessage({
@@ -172,28 +194,11 @@ function openBox(img) {
             });
         });
     }
-
-    /* -------- POSITION -------- */
-    function position() {
-        const r = img.getBoundingClientRect();
-        host.style.top = window.scrollY + r.top + 10 + 'px';
-        host.style.left = window.scrollX + r.left + 10 + 'px';
-    }
 }
 
-/* ---------------- CLOSE ---------------- */
-function closeBox() {
-    if (currentHost) currentHost.remove();
-    currentHost = null;
-    currentImg = null;
-}
-
-/* ---------------- CLICK ON IMAGE ---------------- */
-document.addEventListener('click', (e) => {
-
-    const img = e.target;
-
-    if (!img || img.tagName !== 'IMG') return;
-
+/* ---------------- CLICK TRIGGER ---------------- */
+document.addEventListener("click", (e) => {
+    const img = e.target.closest("img");
+    if (!img) return;
     openBox(img);
 });
