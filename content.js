@@ -1,9 +1,8 @@
 const SERVER_URL = "http://127.0.0.1:3000";
 
 let activeHost = null;
-let positionHandler = null;
 
-/* ---------------- URL ---------------- */
+/* ---------------- NORMALIZE ---------------- */
 function normalizeUrl(url) {
     try {
         const u = new URL(url);
@@ -13,34 +12,22 @@ function normalizeUrl(url) {
     }
 }
 
-/* ---------------- VALID IMAGE ---------------- */
-function isValid(img) {
-    return img && img.tagName === "IMG" && img.src && img.naturalWidth > 100;
-}
-
 /* ---------------- CLOSE ---------------- */
 function closeBox() {
-
     if (activeHost) {
         activeHost.remove();
         activeHost = null;
-    }
-
-    if (positionHandler) {
-        window.removeEventListener("scroll", positionHandler);
-        window.removeEventListener("resize", positionHandler);
-        positionHandler = null;
     }
 }
 
 /* ---------------- OPEN ---------------- */
 function openBox(img) {
 
-    if (!isValid(img)) return;
-
-    closeBox();
+    if (!img || img.tagName !== "IMG") return;
 
     const url = normalizeUrl(img.src);
+
+    closeBox(); // ❗ חשוב: מונע כפילויות
 
     const host = document.createElement("div");
     host.style.position = "absolute";
@@ -72,6 +59,7 @@ function openBox(img) {
             cursor:pointer;
             border:none;
             background:transparent;
+            font-size:16px;
         }
 
         .btns {
@@ -121,20 +109,19 @@ function openBox(img) {
 
     activeHost = host;
 
-    /* ---------------- POSITION (SAFE SINGLE HANDLER) ---------------- */
+    position();
+
+    window.addEventListener("scroll", position);
+    window.addEventListener("resize", position);
+
+    renderVote();
+
+    /* ---------------- POSITION ---------------- */
     function position() {
         const r = img.getBoundingClientRect();
         host.style.top = window.scrollY + r.top + 10 + "px";
         host.style.left = window.scrollX + r.left + 10 + "px";
     }
-
-    position();
-
-    positionHandler = position;
-    window.addEventListener("scroll", positionHandler);
-    window.addEventListener("resize", positionHandler);
-
-    renderVote();
 
     /* ---------------- VOTE UI ---------------- */
     function renderVote() {
@@ -176,8 +163,8 @@ function openBox(img) {
             </div>
 
             <div class="results">
-                <div class="circle">${r}%</div>
-                <div class="circle">${a}%</div>
+                <div class="circle">${r}% Real</div>
+                <div class="circle">${a}% AI</div>
             </div>
 
             <div style="margin-top:8px;font-size:12px;">
@@ -207,9 +194,10 @@ function openBox(img) {
     }
 }
 
-/* ---------------- CLICK ---------------- */
+/* ---------------- CLICK LISTENER ---------------- */
 document.addEventListener("click", (e) => {
     const img = e.target.closest("img");
     if (!img) return;
+
     openBox(img);
 });
