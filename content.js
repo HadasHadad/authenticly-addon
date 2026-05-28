@@ -1,18 +1,18 @@
 const SERVER_URL = "http://127.0.0.1:3000";
 
+const injectedMap = new WeakMap();
+
+/* ------------------ URL ------------------ */
 function normalizeUrl(imageUrl) {
     try {
         const url = new URL(imageUrl);
         return url.origin + url.pathname;
-    } catch (e) {
+    } catch {
         return imageUrl;
     }
 }
 
-function generateId(src) {
-    return 'img-btn-' + btoa(encodeURIComponent(src)).replace(/[^a-zA-Z0-9]/g, '');
-}
-
+/* ------------------ VALID ------------------ */
 function isValidImage(img) {
     return (
         img.src &&
@@ -22,289 +22,221 @@ function isValidImage(img) {
     );
 }
 
-/* --------------------------
-   FIX: close button working everywhere
--------------------------- */
-function attachCloseEvent(host, bubble) {
+/* ------------------ MAIN ------------------ */
+function injectTrustTool(img) {
 
-    const closeBtn = bubble.querySelector('.close-btn');
+    if (!isValidImage(img)) return;
 
-    if (!closeBtn) return;
+    if (img.dataset.injected === "1") return;
+    img.dataset.injected = "1";
 
-    closeBtn.onclick = () => {
-
-        host.style.opacity = '0';
-        host.style.transform = 'scale(0.8)';
-
-        setTimeout(() => {
-            host.remove();
-        }, 200);
-    };
-}
-
-/* --------------------------
-   MAIN INJECT
--------------------------- */
-function injectTrustTool(imageElement) {
-
-    if (imageElement.src.startsWith('data:')) return;
-    if (!isValidImage(imageElement)) return;
-
-    const cleanUrl = normalizeUrl(imageElement.src);
-    const id = generateId(imageElement.src);
-
-    if (document.getElementById(id)) return;
+    const cleanUrl = normalizeUrl(img.src);
 
     const host = document.createElement('div');
-
-    host.id = id;
-    host.className = 'trust-tool-container';
     host.style.position = 'absolute';
-    host.style.zIndex = '2147483647';
+    host.style.zIndex = '999999999';
     host.style.pointerEvents = 'none';
-
-    function updatePosition() {
-
-        const rect = imageElement.getBoundingClientRect();
-
-        let top = rect.top + window.scrollY + 15;
-        let left = rect.left + window.scrollX + 15;
-
-        const bubbleWidth = 220;
-
-        if (left + bubbleWidth > window.innerWidth) {
-            left = window.innerWidth - bubbleWidth - 20;
-        }
-
-        host.style.top = top + 'px';
-        host.style.left = left + 'px';
-    }
 
     const shadow = host.attachShadow({ mode: 'open' });
 
     const style = document.createElement('style');
 
     style.textContent = `
-    :host {
-        direction: rtl;
-        font-family: Arial;
-    }
+        .box {
+            font-family: Arial;
+            direction: rtl;
+        }
 
-    .trust-bubble {
-        pointer-events: auto;
-        background: rgba(255,255,255,0.95);
-        backdrop-filter: blur(12px);
-        padding: 16px;
-        border-radius: 22px;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.18);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-        min-width: 180px;
-        max-width: 220px;
-    }
+        .bubble {
+            pointer-events: auto;
+            background: white;
+            border-radius: 16px;
+            padding: 14px;
+            width: 200px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
 
-    .top-bar {
-        width: 100%;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+        .top {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+        }
 
-    .brand {
-        font-weight: 800;
-    }
+        .x {
+            cursor:pointer;
+            border:none;
+            background:transparent;
+            font-size:16px;
+        }
 
-    .close-btn {
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        font-size: 16px;
-    }
+        .btns {
+            display:flex;
+            gap:8px;
+            margin-top:10px;
+        }
 
-    .vote-options {
-        display: flex;
-        gap: 8px;
-        width: 100%;
-    }
+        .btn {
+            flex:1;
+            border:none;
+            padding:8px;
+            border-radius:999px;
+            cursor:pointer;
+            font-weight:bold;
+        }
 
-    .btn {
-        flex: 1;
-        border: none;
-        border-radius: 999px;
-        padding: 8px;
-        cursor: pointer;
-        font-weight: 700;
-    }
+        .real {
+            background:#d4f5dd;
+            color:#1b5e20;
+        }
 
-    .btn-real { background:#e8f5e9; }
-    .btn-ai { background:#fde7ef; }
+        .ai {
+            background:#ffd6e0;
+            color:#b0003a;
+        }
 
-    .results {
-        display:none;
-    }
+        .results {
+            display:none;
+            margin-top:10px;
+            gap:10px;
+        }
 
-    .voted .results {
-        display:flex;
-    }
+        .circle {
+            width:60px;
+            height:60px;
+            border-radius:50%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-weight:bold;
+            background:#eee;
+        }
 
-    .circle {
-        width: 72px;
-        height: 72px;
-        border-radius: 50%;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-weight:800;
-        background:#eee;
-    }
+        .voted .btns {
+            display:none;
+        }
+
+        .voted .results {
+            display:flex;
+        }
     `;
 
     const bubble = document.createElement('div');
-    bubble.className = 'trust-bubble';
-    bubble.innerHTML = `<span>טוען...</span>`;
+    bubble.className = 'bubble';
 
     shadow.appendChild(style);
     shadow.appendChild(bubble);
-
     document.body.appendChild(host);
 
-    setTimeout(() => bubble.classList.add('visible'), 50);
+    /* ---------------- POSITION ---------------- */
+    function position() {
+        const r = img.getBoundingClientRect();
+        host.style.top = window.scrollY + r.top + 10 + 'px';
+        host.style.left = window.scrollX + r.left + 10 + 'px';
+    }
 
-    /* --------------------------
-       FETCH DATA
-    -------------------------- */
+    position();
+    window.addEventListener('scroll', position);
+    window.addEventListener('resize', position);
+
+    /* ---------------- FETCH ---------------- */
     chrome.runtime.sendMessage({
         action: "fetchData",
         url: `${SERVER_URL}/front?url=${encodeURIComponent(cleanUrl)}`
-    }, (response) => {
+    }, (res) => {
 
-        if (!response?.data) {
-            bubble.innerHTML = "שגיאת שרת";
+        if (!res?.data) {
+            bubble.innerHTML = "error";
             return;
         }
 
-        const { real, ai } = response.data;
+        const { real, ai } = res.data;
 
         chrome.storage.local.get(cleanUrl, (s) => {
-
             if (s[cleanUrl]) {
-                showResultsUI(host, bubble, real, ai);
+                renderResults(real, ai);
             } else {
-                showVoteUI(host, bubble, cleanUrl);
+                renderVote();
             }
         });
     });
 
-    updatePosition();
-    window.addEventListener('scroll', updatePosition);
-    window.addEventListener('resize', updatePosition);
+    /* ---------------- VOTE UI ---------------- */
+    function renderVote() {
 
-    /* --------------------------
-       HOVER FIX (NO FLICKER)
-    -------------------------- */
-    let hideTimeout;
+        bubble.classList.remove('voted');
 
-    imageElement.addEventListener('mouseenter', () => {
-        clearTimeout(hideTimeout);
-        host.style.display = 'block';
-    });
+        bubble.innerHTML = `
+            <div class="top">
+                <b>Authenticly</b>
+                <button class="x">✕</button>
+            </div>
 
-    imageElement.addEventListener('mouseleave', () => {
+            <div>אמיתי או AI?</div>
 
-        hideTimeout = setTimeout(() => {
-            host.style.display = 'none';
-        }, 150);
-    });
+            <div class="btns">
+                <button class="btn real">Real</button>
+                <button class="btn ai">AI</button>
+            </div>
+        `;
 
-    host.addEventListener('mouseenter', () => {
-        clearTimeout(hideTimeout);
-    });
-}
+        bubble.querySelector('.real').onclick =
+            () => sendVote('real');
 
-/* --------------------------
-   VOTE UI
--------------------------- */
-function showVoteUI(host, bubble, cleanUrl) {
+        bubble.querySelector('.ai').onclick =
+            () => sendVote('ai');
 
-    bubble.innerHTML = `
-        <div class="top-bar">
-            <span class="brand">Authenticly</span>
-            <button class="close-btn">✕</button>
-        </div>
+        bubble.querySelector('.x').onclick =
+            () => host.remove();
+    }
 
-        <div>אמיתי או AI?</div>
+    /* ---------------- RESULTS UI ---------------- */
+    function renderResults(real, ai) {
 
-        <div class="vote-options">
-            <button class="btn btn-real">Real</button>
-            <button class="btn btn-ai">AI</button>
-        </div>
-    `;
+        const total = real + ai || 1;
 
-    bubble.querySelector('.btn-real').onclick =
-        () => sendVote(cleanUrl, 'real', host, bubble);
+        const r = Math.round(real / total * 100);
+        const a = 100 - r;
 
-    bubble.querySelector('.btn-ai').onclick =
-        () => sendVote(cleanUrl, 'ai', host, bubble);
+        bubble.classList.add('voted');
 
-    attachCloseEvent(host, bubble);
-}
+        bubble.innerHTML = `
+            <div class="top">
+                <b>Authenticly</b>
+                <button class="x">✕</button>
+            </div>
 
-/* --------------------------
-   RESULTS UI
--------------------------- */
-function showResultsUI(host, bubble, real, ai) {
+            <div class="results">
+                <div class="circle" style="background:#c8f7d4">${r}%</div>
+                <div class="circle" style="background:#ffd0dc">${a}%</div>
+            </div>
 
-    const total = real + ai || 1;
+            <div>${total} votes</div>
+        `;
 
-    const r = Math.round((real / total) * 100);
-    const a = 100 - r;
+        bubble.querySelector('.x').onclick =
+            () => host.remove();
+    }
 
-    bubble.innerHTML = `
-        <div class="top-bar">
-            <span class="brand">Authenticly</span>
-            <button class="close-btn">✕</button>
-        </div>
+    /* ---------------- VOTE ---------------- */
+    function sendVote(type) {
 
-        <div style="display:flex; gap:10px;">
-            <div class="circle">${r}%</div>
-            <div class="circle">${a}%</div>
-        </div>
+        chrome.runtime.sendMessage({
+            action: "fetchData",
+            url: `${SERVER_URL}/vote`,
+            method: "POST",
+            body: { url: cleanUrl, voteType: type }
+        }, (res) => {
 
-        <div>${total} votes</div>
-    `;
+            if (!res?.data) return;
 
-    bubble.classList.add('voted');
-
-    attachCloseEvent(host, bubble);
-}
-
-/* --------------------------
-   SEND VOTE
--------------------------- */
-function sendVote(cleanUrl, type, host, bubble) {
-
-    chrome.runtime.sendMessage({
-        action: "fetchData",
-        url: `${SERVER_URL}/vote`,
-        method: "POST",
-        body: { url: cleanUrl, voteType: type }
-    }, (response) => {
-
-        if (!response?.data) return;
-
-        const { real, ai } = response.data;
-
-        chrome.storage.local.set({ [cleanUrl]: true }, () => {
-            showResultsUI(host, bubble, real, ai);
+            chrome.storage.local.set({ [cleanUrl]: true }, () => {
+                renderResults(res.data.real, res.data.ai);
+            });
         });
-    });
+    }
 }
 
-/* --------------------------
-   OBSERVER
--------------------------- */
+/* ---------------- OBSERVER ---------------- */
 const observer = new MutationObserver((mutations) => {
 
     mutations.forEach(m =>
