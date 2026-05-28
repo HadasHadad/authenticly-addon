@@ -1,7 +1,5 @@
 const SERVER_URL = "http://127.0.0.1:3000";
 
-const injected = new WeakMap();
-
 function normalizeUrl(imageUrl) {
     try {
         const url = new URL(imageUrl);
@@ -9,6 +7,10 @@ function normalizeUrl(imageUrl) {
     } catch (e) {
         return imageUrl;
     }
+}
+
+function generateId(src) {
+    return 'img-btn-' + btoa(encodeURIComponent(src)).replace(/[^a-zA-Z0-9]/g, '');
 }
 
 function isValidImage(img) {
@@ -20,251 +22,289 @@ function isValidImage(img) {
     );
 }
 
-/* ---------------------------
-   CREATE / GET SINGLE BUBBLE
----------------------------- */
+/* --------------------------
+   FIX: close button working everywhere
+-------------------------- */
+function attachCloseEvent(host, bubble) {
 
-function getHost(imageElement) {
+    const closeBtn = bubble.querySelector('.close-btn');
 
-    if (injected.has(imageElement)) {
-        return injected.get(imageElement);
-    }
+    if (!closeBtn) return;
+
+    closeBtn.onclick = () => {
+
+        host.style.opacity = '0';
+        host.style.transform = 'scale(0.8)';
+
+        setTimeout(() => {
+            host.remove();
+        }, 200);
+    };
+}
+
+/* --------------------------
+   MAIN INJECT
+-------------------------- */
+function injectTrustTool(imageElement) {
+
+    if (imageElement.src.startsWith('data:')) return;
+    if (!isValidImage(imageElement)) return;
+
+    const cleanUrl = normalizeUrl(imageElement.src);
+    const id = generateId(imageElement.src);
+
+    if (document.getElementById(id)) return;
 
     const host = document.createElement('div');
 
+    host.id = id;
+    host.className = 'trust-tool-container';
     host.style.position = 'absolute';
     host.style.zIndex = '2147483647';
     host.style.pointerEvents = 'none';
+
+    function updatePosition() {
+
+        const rect = imageElement.getBoundingClientRect();
+
+        let top = rect.top + window.scrollY + 15;
+        let left = rect.left + window.scrollX + 15;
+
+        const bubbleWidth = 220;
+
+        if (left + bubbleWidth > window.innerWidth) {
+            left = window.innerWidth - bubbleWidth - 20;
+        }
+
+        host.style.top = top + 'px';
+        host.style.left = left + 'px';
+    }
 
     const shadow = host.attachShadow({ mode: 'open' });
 
     const style = document.createElement('style');
 
     style.textContent = `
-    :host { font-family: Arial; direction: rtl; }
+    :host {
+        direction: rtl;
+        font-family: Arial;
+    }
 
-    .box {
+    .trust-bubble {
         pointer-events: auto;
-        background: white;
-        border-radius: 18px;
-        padding: 14px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-        width: 200px;
+        background: rgba(255,255,255,0.95);
+        backdrop-filter: blur(12px);
+        padding: 16px;
+        border-radius: 22px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.18);
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        align-items: center;
+        gap: 12px;
+        min-width: 180px;
+        max-width: 220px;
     }
 
-    .top {
+    .top-bar {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .brand {
+        font-weight: 800;
+    }
+
+    .close-btn {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 16px;
+    }
+
+    .vote-options {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .btn {
+        flex: 1;
+        border: none;
+        border-radius: 999px;
+        padding: 8px;
+        cursor: pointer;
+        font-weight: 700;
+    }
+
+    .btn-real { background:#e8f5e9; }
+    .btn-ai { background:#fde7ef; }
+
+    .results {
+        display:none;
+    }
+
+    .voted .results {
         display:flex;
-        justify-content:space-between;
-        font-weight:800;
     }
-
-    .btns {
-        display:flex;
-        gap:8px;
-    }
-
-    button {
-        flex:1;
-        border:none;
-        border-radius:999px;
-        padding:6px;
-        cursor:pointer;
-        font-weight:700;
-    }
-
-    .real { background:#e8f5e9; }
-    .ai { background:#fde7ef; }
 
     .circle {
-        width:70px;
-        height:70px;
-        border-radius:50%;
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
         display:flex;
         align-items:center;
         justify-content:center;
         font-weight:800;
         background:#eee;
     }
-
-    .stats {
-        display:flex;
-        justify-content:space-around;
-        font-size:12px;
-    }
     `;
 
-    const box = document.createElement('div');
-    box.className = 'box';
-    box.innerHTML = `<div>Loading...</div>`;
+    const bubble = document.createElement('div');
+    bubble.className = 'trust-bubble';
+    bubble.innerHTML = `<span>טוען...</span>`;
 
     shadow.appendChild(style);
-    shadow.appendChild(box);
+    shadow.appendChild(bubble);
 
-    host._box = box;
     document.body.appendChild(host);
 
-    injected.set(imageElement, host);
+    setTimeout(() => bubble.classList.add('visible'), 50);
 
-    return host;
-}
-
-/* ---------------------------
-   POSITION
----------------------------- */
-
-function position(host, img) {
-
-    const rect = img.getBoundingClientRect();
-
-    host.style.top = (rect.top + window.scrollY + 10) + 'px';
-    host.style.left = (rect.left + window.scrollX + 10) + 'px';
-}
-
-/* ---------------------------
-   LOAD DATA
----------------------------- */
-
-function loadStats(cleanUrl, box) {
-
+    /* --------------------------
+       FETCH DATA
+    -------------------------- */
     chrome.runtime.sendMessage({
         action: "fetchData",
         url: `${SERVER_URL}/front?url=${encodeURIComponent(cleanUrl)}`
-    }, (res) => {
+    }, (response) => {
 
-        if (!res?.data) {
-            box.innerHTML = "Error";
+        if (!response?.data) {
+            bubble.innerHTML = "שגיאת שרת";
             return;
         }
 
-        const { real, ai, totalVotes = real + ai } = res.data;
+        const { real, ai } = response.data;
 
-        const r = Math.round((real / (real + ai || 1)) * 100);
-        const a = 100 - r;
+        chrome.storage.local.get(cleanUrl, (s) => {
 
-        renderResults(box, cleanUrl, r, a, totalVotes);
+            if (s[cleanUrl]) {
+                showResultsUI(host, bubble, real, ai);
+            } else {
+                showVoteUI(host, bubble, cleanUrl);
+            }
+        });
+    });
+
+    updatePosition();
+    window.addEventListener('scroll', updatePosition);
+    window.addEventListener('resize', updatePosition);
+
+    /* --------------------------
+       HOVER FIX (NO FLICKER)
+    -------------------------- */
+    let hideTimeout;
+
+    imageElement.addEventListener('mouseenter', () => {
+        clearTimeout(hideTimeout);
+        host.style.display = 'block';
+    });
+
+    imageElement.addEventListener('mouseleave', () => {
+
+        hideTimeout = setTimeout(() => {
+            host.style.display = 'none';
+        }, 150);
+    });
+
+    host.addEventListener('mouseenter', () => {
+        clearTimeout(hideTimeout);
     });
 }
 
-/* ---------------------------
-   RENDER VOTE UI
----------------------------- */
+/* --------------------------
+   VOTE UI
+-------------------------- */
+function showVoteUI(host, bubble, cleanUrl) {
 
-function renderVote(box, cleanUrl) {
-
-    box.innerHTML = `
-        <div class="top">
-            <span>Authenticly</span>
+    bubble.innerHTML = `
+        <div class="top-bar">
+            <span class="brand">Authenticly</span>
+            <button class="close-btn">✕</button>
         </div>
 
         <div>אמיתי או AI?</div>
 
-        <div class="btns">
-            <button class="real">Real</button>
-            <button class="ai">AI</button>
+        <div class="vote-options">
+            <button class="btn btn-real">Real</button>
+            <button class="btn btn-ai">AI</button>
         </div>
     `;
 
-    box.querySelector('.real').onclick =
-        () => sendVote(cleanUrl, 'real', box);
+    bubble.querySelector('.btn-real').onclick =
+        () => sendVote(cleanUrl, 'real', host, bubble);
 
-    box.querySelector('.ai').onclick =
-        () => sendVote(cleanUrl, 'ai', box);
+    bubble.querySelector('.btn-ai').onclick =
+        () => sendVote(cleanUrl, 'ai', host, bubble);
+
+    attachCloseEvent(host, bubble);
 }
 
-/* ---------------------------
-   RENDER RESULTS
----------------------------- */
+/* --------------------------
+   RESULTS UI
+-------------------------- */
+function showResultsUI(host, bubble, real, ai) {
 
-function renderResults(box, cleanUrl, r, a, total) {
+    const total = real + ai || 1;
 
-    box.innerHTML = `
-        <div class="top">
-            <span>Authenticly</span>
+    const r = Math.round((real / total) * 100);
+    const a = 100 - r;
+
+    bubble.innerHTML = `
+        <div class="top-bar">
+            <span class="brand">Authenticly</span>
+            <button class="close-btn">✕</button>
         </div>
 
-        <div style="display:flex; gap:10px; justify-content:center;">
+        <div style="display:flex; gap:10px;">
             <div class="circle">${r}%</div>
             <div class="circle">${a}%</div>
         </div>
 
-        <div class="stats">
-            <span>Real ${r}%</span>
-            <span>AI ${a}%</span>
-        </div>
-
-        <div class="stats">
-            <span>${total} votes</span>
-        </div>
+        <div>${total} votes</div>
     `;
+
+    bubble.classList.add('voted');
+
+    attachCloseEvent(host, bubble);
 }
 
-/* ---------------------------
-   VOTE
----------------------------- */
-
-function sendVote(cleanUrl, type, box) {
+/* --------------------------
+   SEND VOTE
+-------------------------- */
+function sendVote(cleanUrl, type, host, bubble) {
 
     chrome.runtime.sendMessage({
         action: "fetchData",
         url: `${SERVER_URL}/vote`,
         method: "POST",
         body: { url: cleanUrl, voteType: type }
-    }, (res) => {
+    }, (response) => {
 
-        if (!res?.data) return;
+        if (!response?.data) return;
 
-        const { real, ai } = res.data;
+        const { real, ai } = response.data;
 
-        const r = Math.round((real / (real + ai || 1)) * 100);
-        const a = 100 - r;
-
-        renderResults(box, cleanUrl, r, a, real + ai);
+        chrome.storage.local.set({ [cleanUrl]: true }, () => {
+            showResultsUI(host, bubble, real, ai);
+        });
     });
 }
 
-/* ---------------------------
-   MAIN INJECT
----------------------------- */
-
-function inject(imageElement) {
-
-    if (!isValidImage(imageElement)) return;
-
-    const cleanUrl = normalizeUrl(imageElement.src);
-
-    const host = getHost(imageElement);
-
-    const box = host._box;
-
-    const update = () => position(host, imageElement);
-
-    update();
-
-    window.addEventListener('scroll', update);
-    window.addEventListener('resize', update);
-
-    imageElement.addEventListener('mouseenter', () => {
-
-        host.style.display = 'block';
-
-        position(host, imageElement);
-
-        renderVote(box, cleanUrl);
-    });
-
-    imageElement.addEventListener('mouseleave', () => {
-
-        host.style.display = 'none';
-    });
-}
-
-/* ---------------------------
+/* --------------------------
    OBSERVER
----------------------------- */
-
+-------------------------- */
 const observer = new MutationObserver((mutations) => {
 
     mutations.forEach(m =>
@@ -272,9 +312,9 @@ const observer = new MutationObserver((mutations) => {
 
             if (node.nodeType !== 1) return;
 
-            if (node.tagName === 'IMG') inject(node);
+            if (node.tagName === 'IMG') injectTrustTool(node);
 
-            node.querySelectorAll?.('img')?.forEach(inject);
+            node.querySelectorAll?.('img')?.forEach(injectTrustTool);
         })
     );
 });
