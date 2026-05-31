@@ -1,5 +1,14 @@
 const SERVER_URL = "http://127.0.0.1:3000";
 
+/* =========================
+   מניעת כפילויות גלובלית
+========================= */
+const processedUrls = new Set();
+
+/* =========================
+   עזר
+========================= */
+
 function normalizeUrl(imageUrl) {
     try {
         const url = new URL(imageUrl);
@@ -22,100 +31,88 @@ function isValidImage(img) {
     );
 }
 
+/* =========================
+   הזרקה ראשית
+========================= */
+
 function injectTrustTool(imageElement) {
+
+    if (!imageElement) return;
 
     if (imageElement.src.startsWith('data:')) return;
 
-    if (!isValidImage(imageElement) || imageElement.dataset.trustInjected) return;
-
-    imageElement.dataset.trustInjected = "true";
+    if (!isValidImage(imageElement)) return;
 
     const cleanUrl = normalizeUrl(imageElement.src);
 
-    const id = generateId(imageElement.src);
+    if (processedUrls.has(cleanUrl)) return;
+    processedUrls.add(cleanUrl);
 
-    // מונע כפילויות
+    if (!imageElement.complete) {
+        imageElement.addEventListener('load', () => injectTrustTool(imageElement), { once: true });
+        return;
+    }
+
+    const id = generateId(cleanUrl);
+
     if (document.getElementById(id)) return;
 
     const host = document.createElement('div');
-
     host.id = id;
-
     host.className = 'trust-tool-container';
-
     host.style.position = 'absolute';
-
     host.style.zIndex = '2147483647';
-
-    // לא חוסם קליקים על הדף
     host.style.pointerEvents = 'none';
 
     function updatePosition() {
-
         const rect = imageElement.getBoundingClientRect();
 
         let top = rect.top + window.scrollY + 15;
-
         let left = rect.left + window.scrollX + 15;
 
-        const bubbleWidth = 220;
+        const bubbleWidth = 320;
 
         if (left + bubbleWidth > window.innerWidth) {
-
             left = window.innerWidth - bubbleWidth - 20;
         }
 
         host.style.top = top + 'px';
-
         host.style.left = left + 'px';
     }
 
     updatePosition();
 
-    window.addEventListener('scroll', updatePosition);
+    const onScroll = () => updatePosition();
+    const onResize = () => updatePosition();
 
-    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', onScroll);
+    window.addEventListener('resize', onResize);
 
     const shadow = host.attachShadow({ mode: 'open' });
 
     const style = document.createElement('style');
-
     style.textContent = `
-
     :host {
         direction: rtl;
-        pointer-events: auto;
         font-family: Arial, sans-serif;
     }
 
     .trust-bubble {
-
         pointer-events: auto;
-
         background: rgba(255,255,255,0.95);
-
         backdrop-filter: blur(12px);
-
-        padding: 16px;
-
+        padding: 18px;
         border-radius: 22px;
-
-        box-shadow:
-            0 8px 30px rgba(0,0,0,0.18);
-
+        box-shadow: 0 8px 30px rgba(0,0,0,0.18);
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 12px;
-
+        gap: 14px;
         transition: all 0.25s ease;
-
         opacity: 0;
         transform: scale(0.92);
-
-        min-width: 180px;
-        max-width: 220px;
-
+        min-width: 320px;
+        max-width: 360px;
         position: relative;
     }
 
@@ -125,475 +122,197 @@ function injectTrustTool(imageElement) {
     }
 
     .top-bar {
-
         width: 100%;
-
         display: flex;
-
         justify-content: space-between;
-
         align-items: center;
     }
 
     .brand {
-
-        font-size: 14px;
-
+        font-size: 20px;
         font-weight: 800;
-
         color: #222;
-
-        letter-spacing: 0.3px;
     }
 
     .close-btn {
-
         border: none;
-
         background: transparent;
-
         cursor: pointer;
-
-        font-size: 16px;
-
+        font-size: 18px;
         color: #666;
-
-        padding: 0;
-
-        transition: 0.2s;
-    }
-
-    .close-btn:hover {
-
-        color: #111;
-
-        transform: scale(1.1);
-    }
-
-    .vote-label {
-
-        font-size: 14px;
-
-        font-weight: 700;
-
-        color: #444;
     }
 
     .vote-options {
-
         display: flex;
-
-        gap: 8px;
-
+        gap: 10px;
         width: 100%;
     }
 
     .btn {
-
-        border: none;
-
-        border-radius: 999px;
-
-        padding: 8px 12px;
-
-        cursor: pointer;
-
-        font-size: 13px;
-
-        font-weight: 700;
-
         flex: 1;
-
-        transition: 0.2s ease;
+        padding: 12px 18px;
+        border-radius: 999px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
     }
 
-    .btn:hover {
-        transform: scale(1.04);
-    }
-
-    .btn-real {
-        background: #e8f5e9;
-        color: #2e7d32;
-    }
-
-    .btn-ai {
-        background: #fde7ef;
-        color: #c2185b;
-    }
-
-    .results {
-        display: none;
-        gap: 18px;
-    }
-
-    .voted .vote-options,
-    .voted .vote-label {
-        display: none;
-    }
-
-    .voted .results {
-        display: flex;
-    }
-
-    .result-item {
-
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-
-        gap: 8px;
-
-        font-size: 14px;
-        color: #333;
-    }
+    .btn-real { background: #e8f5e9; color: #2e7d32; }
+    .btn-ai { background: #fde7ef; color: #c2185b; }
 
     .circle {
-
-        width: 72px;
-        height: 72px;
-
+        width: 110px;
+        height: 110px;
         border-radius: 50%;
-
         display: flex;
-        justify-content: center;
         align-items: center;
-
-        font-size: 18px;
+        justify-content: center;
+        font-size: 26px;
         font-weight: 800;
-
-        color: #111;
-
         background: #eee;
-
-        box-shadow:
-            inset 0 0 0 3px rgba(255,255,255,0.6);
     }
 
     .vote-count {
-
-        font-size: 12px;
+        font-size: 15px;
+        font-weight: 700;
         color: #777;
-        margin-top: 4px;
-        font-weight: 600;
     }
-
-    @media (max-width: 600px) {
-
-        .trust-bubble {
-
-            min-width: 160px;
-            padding: 12px;
-        }
-
-        .circle {
-
-            width: 60px;
-            height: 60px;
-            font-size: 15px;
-        }
-
-        .btn {
-
-            padding: 6px 10px;
-            font-size: 12px;
-        }
-    }
-
     `;
 
     const bubble = document.createElement('div');
-
     bubble.className = 'trust-bubble';
-
-    bubble.innerHTML = `<span class="loading">טוען...</span>`;
+    bubble.innerHTML = `<span>טוען...</span>`;
 
     shadow.appendChild(style);
-
     shadow.appendChild(bubble);
-
     document.body.appendChild(host);
 
     setTimeout(() => bubble.classList.add('visible'), 50);
 
     chrome.runtime.sendMessage({
-
         action: "fetchData",
-
         url: `${SERVER_URL}/front?url=${encodeURIComponent(cleanUrl)}`
-
     }, (response) => {
 
-        if (response && response.data) {
-
-            const { real, ai } = response.data;
-
-            const total = real + ai;
-
-            const realPercent =
-                total > 0
-                    ? Math.round((real / total) * 100)
-                    : 0;
-
-            const aiPercent = 100 - realPercent;
-
-            chrome.storage.local.get(cleanUrl, (s) => {
-
-                if (s[cleanUrl]) {
-
-                    showResultsUI(
-                        bubble,
-                        real,
-                        ai
-                    );
-
-                } else {
-
-                    showVoteOptionsUI(
-                        bubble,
-                        cleanUrl,
-                        realPercent,
-                        aiPercent
-                    );
-                }
-            });
-
-        } else {
-
-            bubble.innerHTML =
-                `<span class="loading">שגיאת שרת</span>`;
+        if (!response?.data) {
+            bubble.innerHTML = "שגיאת שרת";
+            return;
         }
-    });
-}
 
-function attachCloseEvent(bubble) {
+        const { real, ai } = response.data;
 
-    const closeBtn = bubble.querySelector('.close-btn');
+        chrome.storage.local.get(cleanUrl, (s) => {
 
-    if (!closeBtn) return;
-
-    closeBtn.onclick = () => {
-
-        bubble.style.opacity = '0';
-
-        bubble.style.transform = 'scale(0.8)';
-
-        setTimeout(() => {
-
-            const shadowRoot = bubble.parentNode;
-
-            if (shadowRoot && shadowRoot.host) {
-
-                shadowRoot.host.remove();
+            if (s[cleanUrl]) {
+                showResultsUI(bubble, real, ai);
+            } else {
+                showVoteOptionsUI(bubble, cleanUrl);
             }
+        });
+    });
 
-        }, 200);
-    };
-}
+    function attachCloseEvent() {
+        const btn = bubble.querySelector('.close-btn');
+        if (!btn) return;
 
-function showVoteOptionsUI(
-    bubble,
-    cleanUrl,
-    realPercent,
-    aiPercent
-) {
+        btn.onclick = () => {
+            bubble.style.opacity = '0';
+            bubble.style.transform = 'scale(0.8)';
 
-    bubble.innerHTML = `
+            setTimeout(() => {
+                host.remove();
+                processedUrls.delete(cleanUrl);
 
+                window.removeEventListener('scroll', onScroll);
+                window.removeEventListener('resize', onResize);
+            }, 200);
+        };
+    }
+
+    function showVoteOptionsUI(bubble, cleanUrl) {
+        bubble.innerHTML = `
         <div class="top-bar">
-
-            <span class="brand">
-                Authenticly
-            </span>
-
-            <button class="close-btn">
-                ✕
-            </button>
-
+            <span class="brand">Authenticly</span>
+            <button class="close-btn">✕</button>
         </div>
-
-        <span class="vote-label">
-            אמיתי או AI?
-        </span>
 
         <div class="vote-options">
-
-            <button
-                class="btn btn-real"
-                id="vote-real">
-
-                Real
-
-            </button>
-
-            <button
-                class="btn btn-ai"
-                id="vote-ai">
-
-                AI
-
-            </button>
-
+            <button class="btn btn-real" id="real">Real</button>
+            <button class="btn btn-ai" id="ai">AI</button>
         </div>
-    `;
+        `;
 
-    bubble.querySelector('#vote-real').onclick =
-        () => sendVote(cleanUrl, 'real', bubble);
+        bubble.querySelector('#real').onclick = () => sendVote(cleanUrl, 'real', bubble);
+        bubble.querySelector('#ai').onclick = () => sendVote(cleanUrl, 'ai', bubble);
 
-    bubble.querySelector('#vote-ai').onclick =
-        () => sendVote(cleanUrl, 'ai', bubble);
+        attachCloseEvent();
+    }
 
-    attachCloseEvent(bubble);
-}
+    function sendVote(cleanUrl, voteType, bubble) {
 
-function sendVote(cleanUrl, voteType, bubble) {
+        chrome.runtime.sendMessage({
+            action: "fetchData",
+            url: `${SERVER_URL}/vote`,
+            method: "POST",
+            body: { url: cleanUrl, voteType }
+        }, (response) => {
 
-    chrome.runtime.sendMessage({
+            if (!response?.data) {
+                alert("שגיאה בשליחה!");
+                return;
+            }
 
-        action: "fetchData",
-
-        url: `${SERVER_URL}/vote`,
-
-        method: "POST",
-
-        body: {
-            url: cleanUrl,
-            voteType: voteType
-        }
-
-    }, (response) => {
-
-        if (response && response.data) {
-
-            chrome.storage.local.set({
-
-                [cleanUrl]: { voted: true }
-
-            }, () => {
-
-                showResultsUI(
-                    bubble,
-                    response.data.real,
-                    response.data.ai
-                );
+            chrome.storage.local.set({ [cleanUrl]: true }, () => {
+                showResultsUI(bubble, response.data.real, response.data.ai);
             });
+        });
+    }
 
-        } else {
+    function showResultsUI(bubble, real, ai) {
 
-            alert("שגיאה בשליחה!");
-        }
-    });
-}
+        const total = real + ai;
+        const rP = total ? Math.round((real / total) * 100) : 0;
+        const aP = 100 - rP;
 
-function showResultsUI(bubble, real, ai) {
-
-    const total = real + ai;
-
-    const rP =
-        total > 0
-            ? Math.round((real / total) * 100)
-            : 0;
-
-    const aP = 100 - rP;
-
-    bubble.innerHTML = `
-
+        bubble.innerHTML = `
         <div class="top-bar">
-
-            <span class="brand">
-                Authenticly
-            </span>
-
-            <button class="close-btn">
-                ✕
-            </button>
-
+            <span class="brand">Authenticly</span>
+            <button class="close-btn">✕</button>
         </div>
 
-        <div
-            class="results"
-            style="display:flex;">
-
-            <div class="result-item">
-
-                <div
-                    class="circle"
-
-                    style="
-                    background:
-                    conic-gradient(
-                        #4caf50 ${rP}%,
-                        #eee 0
-                    );
-                    ">
-
-                    ${rP}%
-
-                </div>
-
-                Real
-
-            </div>
-
-            <div class="result-item">
-
-                <div
-                    class="circle"
-
-                    style="
-                    background:
-                    conic-gradient(
-                        #f44336 ${aP}%,
-                        #eee 0
-                    );
-                    ">
-
-                    ${aP}%
-
-                </div>
-
-                AI
-
-            </div>
-
+        <div style="display:flex; gap:15px;">
+            <div class="circle">${rP}%</div>
+            <div class="circle">${aP}%</div>
         </div>
 
-        <div class="vote-count">
+        <div class="vote-count">${total} votes</div>
+        `;
 
-            ${total} votes
-
-        </div>
-    `;
-
-    bubble.classList.add('voted');
-
-    attachCloseEvent(bubble);
+        bubble.classList.add('voted');
+        attachCloseEvent();
+    }
 }
+
+/* =========================
+   Observer
+========================= */
 
 const observer = new MutationObserver((mutations) => {
-
     mutations.forEach(m =>
-
         m.addedNodes.forEach(node => {
-
             if (node.nodeType === 1) {
-
-                if (node.tagName === 'IMG') {
-
-                    injectTrustTool(node);
-                }
-
-                if (node.querySelectorAll) {
-
-                    node.querySelectorAll('img')
-                        .forEach(injectTrustTool);
-                }
+                if (node.tagName === 'IMG') injectTrustTool(node);
+                node.querySelectorAll?.('img').forEach(injectTrustTool);
             }
         })
     );
 });
 
 observer.observe(document.body, {
-
     childList: true,
     subtree: true
 });
+
+/* סריקה ראשונית */
+document.querySelectorAll('img').forEach(injectTrustTool);
