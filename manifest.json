@@ -8,9 +8,7 @@
   },
   "permissions": ["storage"],
   "host_permissions": [
-    "*://*.ynet.co.il/*",
-    "*://*.google.com/*",
-    "http://localhost:3000/*"
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html"
