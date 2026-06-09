@@ -2,71 +2,68 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 
-const app = express(); // הגדרת ה-app חייבת להיות כאן, לפני השימוש בו!
+const app = express();
 
-// 1. הגדרות Middleware
 app.use(cors({
-    origin: "*", 
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-// הוספת ה-Header שפותר את בעיית ה-Private Network של כרום
 app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Private-Network', 'true');
-    next();
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  next();
 });
 
 app.use(express.json());
 app.use(express.static("public"));
 
-// 2. חיבור ל-DB
 mongoose
   .connect("mongodb://127.0.0.1:27017/imagesDB")
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.log(err));
 
-// 3. Schema ו-Model
+// imageKey יכול להיות hash:xxxx (מה pHash) או url:xxxx (מה URL המנורמל)
 const imageSchema = new mongoose.Schema({
-  imageUrl: { type: String, unique: true }, // הוספתי unique: true למשימת ה-DB
+  imageKey: { type: String, unique: true, required: true },
   realCount: { type: Number, default: 0 },
-  aiCount: { type: Number, default: 0 },
-});
+  aiCount:   { type: Number, default: 0 },
+}, { timestamps: true });
+
+imageSchema.index({ imageKey: 1 });
 
 const Image = mongoose.model("Image", imageSchema);
 
-// 4. Routes
+// GET /front?url=<imageKey>
 app.get("/front", async (req, res) => {
-  const imageUrl = req.query.url;
-  if (!imageUrl) return res.status(400).json({ error: "missing url" });
+  const imageKey = req.query.url;
+  if (!imageKey) return res.status(400).json({ error: "missing url" });
 
-  let image = await Image.findOne({ imageUrl: imageUrl });
+  let image = await Image.findOne({ imageKey });
   if (!image) {
-    image = await Image.create({ imageUrl: imageUrl, realCount: 0, aiCount: 0 });
+    image = await Image.create({ imageKey, realCount: 0, aiCount: 0 });
   }
 
   res.json({ real: image.realCount, ai: image.aiCount });
 });
 
+// POST /vote  { url: imageKey, voteType: "real"|"ai" }
 app.post("/vote", async (req, res) => {
-  const { url, voteType } = req.body;
-  if (!url || !voteType) return res.status(400).json({ error: "missing params" });
+  const { url: imageKey, voteType } = req.body;
+  if (!imageKey || !voteType) return res.status(400).json({ error: "missing params" });
+  if (!["real", "ai"].includes(voteType)) return res.status(400).json({ error: "invalid voteType" });
 
-  let image = await Image.findOne({ imageUrl: url });
+  let image = await Image.findOne({ imageKey });
   if (!image) {
-    image = await Image.create({ imageUrl: url, realCount: 0, aiCount: 0 });
+    image = await Image.create({ imageKey, realCount: 0, aiCount: 0 });
   }
 
   if (voteType === "ai") image.aiCount++;
-  else if (voteType === "real") image.realCount++;
-  else return res.status(400).json({ error: "invalid voteType" });
+  else image.realCount++;
 
   await image.save();
   res.json({ real: image.realCount, ai: image.aiCount });
 });
 
-// 5. הפעלת השרת
 const port = 3000;
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
+app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
