@@ -23,11 +23,42 @@ function normalizeUrl(imageUrl) {
 }
 
 // ─── Hash via background (bypasses CORS completely) ──────────────────────────
-function computeImageHash(imageUrl) {
+// Hash an already-loaded img element directly (no fetch, no CORS issues)
+function hashImgElement(imgEl) {
+  try {
+    const SIZE = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE; canvas.height = SIZE;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgEl, 0, 0, SIZE, SIZE);
+    const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
+    const grays = [];
+    for (let i = 0; i < data.length; i += 4) {
+      grays.push(Math.round(0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2]));
+    }
+    const avg = grays.reduce((a, b) => a + b, 0) / grays.length;
+    const hash = grays.map(v => v >= avg ? '1' : '0').join('');
+    const ones = hash.split('1').length - 1;
+    if (ones < 200 || ones > 3896) return null; // degenerate = failed read
+    return hash;
+  } catch (e) { return null; }
+}
+
+function computeImageHash(imageUrl, imgElement) {
+  // For data: URLs — use the existing element directly (already decoded, no CORS)
+  if (imageUrl.startsWith('data:') && imgElement) {
+    return Promise.resolve(hashImgElement(imgElement));
+  }
+  // Regular URLs — fetch via background to bypass CORS
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action: 'hashImage', url: imageUrl }, (res) => {
       if (chrome.runtime.lastError || !res) { resolve(null); return; }
-      resolve(res.hash || null);
+      const hash = res.hash || null;
+      if (hash) {
+        const ones = hash.split('1').length - 1;
+        if (ones < 200 || ones > 3896) { resolve(null); return; }
+      }
+      resolve(hash);
     });
   });
 }
@@ -44,11 +75,13 @@ const hashBitsCache = {};
 async function getImageKey(imgElement) {
   const src = imgElement.src;
   if (hashCache[src]) return hashCache[src];
-  const hash = await computeImageHash(src);
+  const hash = await computeImageHash(src, imgElement);
   if (hash) hashBitsCache[src] = hash;
   const key = hash ? 'hash:' + hash : 'url:' + normalizeUrl(src);
   hashCache[src] = key;
-
+  console.log("[Authenticly] URL:", src.substring(0,100));
+  console.log("[Authenticly] hash:", hash ? hash.substring(0,40)+"..." : "NULL - CORS blocked");
+  console.log("[Authenticly] key:", key.substring(0,60));
   return key;
 }
 

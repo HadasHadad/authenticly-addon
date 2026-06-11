@@ -1,6 +1,5 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
-  // ─── fetchData: קריאות רגילות לשרת ───────────────────────────────────────
   if (request.action === "fetchData") {
     const method = request.method || 'GET';
     const options = { method, headers: { 'Content-Type': 'application/json' } };
@@ -20,13 +19,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  // ─── hashImage: מוריד תמונה ומחשב pHash — עוקף CORS ─────────────────────
   if (request.action === "hashImage") {
     fetch(request.url)
       .then(res => res.blob())
       .then(blob => createImageBitmap(blob))
       .then(bitmap => {
-        const SIZE = 32;
+        const SIZE = 64; // match content.js
         const canvas = new OffscreenCanvas(SIZE, SIZE);
         const ctx = canvas.getContext('2d');
         ctx.drawImage(bitmap, 0, 0, SIZE, SIZE);
@@ -38,6 +36,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         const avg = grays.reduce((a, b) => a + b, 0) / grays.length;
         const hash = grays.map(v => v >= avg ? '1' : '0').join('');
+
+        // Reject degenerate hashes — all white (CORS block) or all black
+        const ones = hash.split('1').length - 1;
+        if (ones < 200 || ones > 3896) {
+          sendResponse({ hash: null });
+          return;
+        }
         sendResponse({ hash });
       })
       .catch(err => {

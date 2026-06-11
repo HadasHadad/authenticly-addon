@@ -52,7 +52,7 @@ async function findByHash(hashBits) {
     if (dist < bestDist) { bestDist = dist; best = doc; }
   }
   // Threshold: <= 8 bits different = same image
-  return bestDist <= 8 ? best : null;
+  return bestDist <= 200 ? best : null;
 }
 
 // GET /front?url=<imageKey>&hash=<rawHashBits>
