@@ -38,13 +38,22 @@ const hashCache = {};
 // Tracks normalized URLs already injected — prevents duplicate chips
 const injectedSrcs = new Set();
 
+// hashBitsCache stores raw bits separately so we can send them to the server
+const hashBitsCache = {};
+
 async function getImageKey(imgElement) {
   const src = imgElement.src;
   if (hashCache[src]) return hashCache[src];
   const hash = await computeImageHash(src);
+  if (hash) hashBitsCache[src] = hash;
   const key = hash ? 'hash:' + hash : 'url:' + normalizeUrl(src);
   hashCache[src] = key;
+
   return key;
+}
+
+function getHashBits(src) {
+  return hashBitsCache[src] || null;
 }
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
@@ -285,11 +294,16 @@ function injectTrustTool(imageElement) {
   };
 
   const fetchAndShowResults = (myVote) => {
+    const hashBits = getHashBits(imageElement.src);
+    const hashParam = hashBits ? '&hash=' + encodeURIComponent(hashBits) : '';
     chrome.runtime.sendMessage(
-      { action: 'fetchData', url: `${SERVER_URL}/front?url=${encodeURIComponent(imageKey)}` },
+      { action: 'fetchData', url: `${SERVER_URL}/front?url=${encodeURIComponent(imageKey)}${hashParam}` },
       (res) => {
         if (chrome.runtime.lastError) { showResults(null, myVote); return; }
-        showResults(res?.data, myVote);
+        if (res && res.data && res.data.key && res.data.key !== imageKey) {
+          imageKey = res.data.key;
+        }
+        showResults(res ? res.data : null, myVote);
       }
     );
   };
@@ -303,7 +317,7 @@ function injectTrustTool(imageElement) {
     const voteArea = shadow.getElementById('vote-area');
     voteArea.innerHTML = '<div class="loading">Sending...</div>';
     chrome.runtime.sendMessage(
-      { action: 'fetchData', url: `${SERVER_URL}/vote`, method: 'POST', body: { url: imageKey, voteType: type } },
+      { action: 'fetchData', url: `${SERVER_URL}/vote`, method: 'POST', body: { url: imageKey, hash: getHashBits(imageElement.src), voteType: type } },
       (res) => {
         if (chrome.runtime.lastError || res?.error) {
           voted = false; // allow retry on error
