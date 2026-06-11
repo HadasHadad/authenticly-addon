@@ -30,8 +30,6 @@ const imageSchema = new mongoose.Schema({
   aiCount:   { type: Number, default: 0 },
 }, { timestamps: true });
 
-imageSchema.index({ imageKey: 1 });
-
 const Image = mongoose.model("Image", imageSchema);
 
 // GET /front?url=<imageKey>
