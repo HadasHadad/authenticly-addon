@@ -277,7 +277,7 @@ function injectTrustTool(imageElement) {
   shadow.innerHTML = `<style>${BUBBLE_CSS}</style>
     <div class="chip" id="chip" style="pointer-events:auto">
       <span class="chip-icon">🤔</span>
-      <span class="chip-text">Maybe AI?</span>
+      <span class="chip-text">Is it AI?</span>
       <span class="chip-close" id="chip-close">✕</span>
     </div>
     <div class="bubble" id="bubble" style="pointer-events:auto">
@@ -333,8 +333,15 @@ function injectTrustTool(imageElement) {
       { action: 'fetchData', url: `${SERVER_URL}/front?url=${encodeURIComponent(imageKey)}${hashParam}` },
       (res) => {
         if (chrome.runtime.lastError) { showResults(null, myVote); return; }
+        // If server returned a canonical key different from ours, save it locally too
+        // so next time we see this image we skip the vote screen immediately
         if (res && res.data && res.data.key && res.data.key !== imageKey) {
-          imageKey = res.data.key;
+          const canonicalKey = res.data.key;
+          if (myVote) {
+            // Save vote under both keys so any URL variant is recognized
+            chrome.storage.local.set({ [imageKey]: myVote, [canonicalKey]: myVote });
+          }
+          imageKey = canonicalKey;
         }
         showResults(res ? res.data : null, myVote);
       }
@@ -388,21 +395,49 @@ function injectTrustTool(imageElement) {
     chrome.storage.local.get(imageKey, (stored) => {
       const myVote = stored[imageKey];
       if (myVote) {
-        // Already voted — go straight to results
+        // Already voted locally — go straight to results
         fetchAndShowResults(myVote);
       } else {
-        // Show vote buttons
-        const voteArea = shadow.getElementById('vote-area');
-        voteArea.innerHTML = `
-          <div class="vote-question">Real image or AI?</div>
-          <div class="vote-btns">
-            <button class="v-btn real" id="btn-real">📷 Real</button>
-            <button class="v-btn ai" id="btn-ai">🤖 AI</button>
-          </div>`;
-        shadow.getElementById('btn-real').onclick = () => vote('real');
-        shadow.getElementById('btn-ai').onclick   = () => vote('ai');
+        // Check server first — maybe we voted on a different URL of the same image
+        const hashBits = getHashBits(imageElement.src);
+        const hashParam = hashBits ? '&hash=' + encodeURIComponent(hashBits) : '';
+        chrome.runtime.sendMessage(
+          { action: 'fetchData', url: `${SERVER_URL}/front?url=${encodeURIComponent(imageKey)}${hashParam}` },
+          (res) => {
+            if (res && res.data && res.data.key && res.data.key !== imageKey) {
+              // Server found a canonical match — check if we voted on that key
+              const canonicalKey = res.data.key;
+              chrome.storage.local.get(canonicalKey, (stored2) => {
+                const prevVote = stored2[canonicalKey];
+                if (prevVote) {
+                  // We already voted under the canonical key — save locally and show results
+                  chrome.storage.local.set({ [imageKey]: prevVote });
+                  imageKey = canonicalKey;
+                  showResults(res.data, prevVote);
+                } else {
+                  showVoteButtons();
+                }
+              });
+            } else {
+              showVoteButtons();
+            }
+          }
+        );
       }
     });
+  };
+
+  const showVoteButtons = () => {
+    const voteArea = shadow.getElementById('vote-area');
+    if (!voteArea) return;
+    voteArea.innerHTML = `
+      <div class="vote-question">Real image or AI?</div>
+      <div class="vote-btns">
+        <button class="v-btn real" id="btn-real">📷 Real</button>
+        <button class="v-btn ai" id="btn-ai">🤖 AI</button>
+      </div>`;
+    shadow.getElementById('btn-real').onclick = () => vote('real');
+    shadow.getElementById('btn-ai').onclick   = () => vote('ai');
   };
 
   chipEl.addEventListener('click', (e) => {
