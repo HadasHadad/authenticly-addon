@@ -1,4 +1,4 @@
-const SERVER_URL = "http://127.0.0.1:3000";
+const SERVER_URL = "https://sparkling-presence-production-cc79.up.railway.app";
 
 // ─── URL normalization (fallback only) ────────────────────────────────────────
 function normalizeUrl(imageUrl) {
