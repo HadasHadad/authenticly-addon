@@ -7,11 +7,7 @@
     "service_worker": "background.js"
   },
   "permissions": ["storage"],
-  "host_permissions": [
-    "*://*.ynet.co.il/*",
-    "*://*.google.com/*",
-    "http://localhost:3000/*"
-  ],
+  "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html"
   },
@@ -19,6 +15,11 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"]
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["image_tab.js"],
+      "match_about_blank": false
     }
   ]
 }
