@@ -3,10 +3,11 @@
   "name": "Authenticly",
   "version": "1.0",
   "description": "Detect if image is AI or real based on public opinion",
+  "background": {
+    "service_worker": "background.js"
+  },
   "permissions": ["storage"],
-  "host_permissions": [
-    "http://localhost:3000/*"
-  ],
+  "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html"
   },
@@ -14,6 +15,11 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"]
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["image_tab.js"],
+      "match_about_blank": false
     }
   ]
 }

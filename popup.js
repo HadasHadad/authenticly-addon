@@ -1,15 +1,7 @@
-
-function normalizeUrl(imageUrl) {
-    try {
-        const url = new URL(imageUrl);
-        return url.origin + url.pathname;
-    } catch (e) {
-        return imageUrl;
-    }
-}
-
 document.getElementById("clearVotes").addEventListener("click", () => {
-    chrome.storage.local.clear(() => {
-        alert("כל הצבעות המשתמש נמחקו מהזיכרון המקומי! כעת ניתן להצביע מחדש.");
-    });
+  chrome.storage.local.clear(() => {
+    const status = document.getElementById("status");
+    status.textContent = "Voting history cleared. You can vote again on all images.";
+    setTimeout(() => { status.textContent = ""; }, 3000);
+  });
 });

@@ -1,20 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anti-AI Detector</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authenticly</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      width: 240px;
+      padding: 16px;
+      background: #fff;
+      color: #1a1a1a;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .logo-dot {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #1D9E75, #7F77DD);
+      flex-shrink: 0;
+    }
+    h1 { font-size: 15px; font-weight: 600; }
+    .subtitle { font-size: 11px; color: #888; margin-top: 1px; }
+    .divider { height: 0.5px; background: #eee; margin: 12px 0; }
+    .action-btn {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 0.5px solid #ddd;
+      background: #f8f8f8;
+      font-size: 12px;
+      font-weight: 500;
+      color: #444;
+      cursor: pointer;
+      text-align: left;
+      display: flex; align-items: center; gap: 8px;
+      transition: background 0.12s;
+    }
+    .action-btn:hover { background: #efefef; }
+    .action-btn .icon { font-size: 14px; }
+    .status { font-size: 10px; color: #aaa; text-align: center; margin-top: 10px; }
+  </style>
 </head>
-
 <body>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <div>
+      <div class="subtitle">Community trust detector</div>
+    </div>
+  </div>
 
-    <h1>Anti-AI Detector</h1>
+  <div class="divider"></div>
 
-    <button id="clearVotes">
-        נקה היסטוריית הצבעות
-    </button>
+  <button class="action-btn" id="clearVotes">
+    <span class="icon">🗑</span>
+    Clear my voting history
+  </button>
 
-    <script src="popup.js"></script>
+  <div class="status" id="status"></div>
 
+  <script src="popup.js"></script>
 </body>
 </html>
