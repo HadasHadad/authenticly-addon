@@ -4,11 +4,9 @@ const mongoose = require("mongoose");
 
 const app = express();
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+app.use(cors());
+app.use(express.json());
+app.use(express.static("public"));
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Private-Network', 'true');
   next();
@@ -22,12 +20,18 @@ mongoose
   .catch((err) => console.log(err));
 
 const imageSchema = new mongoose.Schema({
-  imageKey: { type: String, unique: true, required: true },
-  // Store raw hash bits separately for fuzzy matching
-  hashBits: { type: String, default: null },
-  realCount: { type: Number, default: 0 },
-  aiCount:   { type: Number, default: 0 },
-}, { timestamps: true });
+  imageUrl: String,
+
+  realCount: {
+    type: Number,
+    default: 0,
+  },
+
+  aiCount: {
+    type: Number,
+    default: 0,
+  },
+});
 
 const Image = mongoose.model("Image", imageSchema);
 
@@ -57,58 +61,75 @@ async function findByHash(hashBits) {
 
 // GET /front?url=<imageKey>&hash=<rawHashBits>
 app.get("/front", async (req, res) => {
-  const imageKey = req.query.url;
-  const hashBits = req.query.hash || null;
-  if (!imageKey) return res.status(400).json({ error: "missing url" });
+  const imageUrl = req.query.url;
 
-  // 1. Try exact key match first
-  let image = await Image.findOne({ imageKey });
-
-  // 2. If not found and we have a hash, try fuzzy match
-  if (!image && hashBits) {
-    const fuzzyMatch = await findByHash(hashBits);
-    if (fuzzyMatch) {
-      // Create an alias pointing to the same data
-      image = fuzzyMatch;
-      // Also save the new key so next lookup is instant
-      await Image.create({ imageKey, hashBits, realCount: fuzzyMatch.realCount, aiCount: fuzzyMatch.aiCount }).catch(() => {});
-    }
+  if (!imageUrl) {
+    return res.status(400).json({
+      error: "missing url",
+    });
   }
 
-  // 3. Nothing found — create new record
+  let image = await Image.findOne({
+    imageUrl: imageUrl,
+  });
+
   if (!image) {
-    image = await Image.create({ imageKey, hashBits, realCount: 0, aiCount: 0 });
+    image = await Image.create({
+      imageUrl: imageUrl,
+      realCount: 0,
+      aiCount: 0,
+    });
   }
 
-  res.json({ real: image.realCount, ai: image.aiCount, key: image.imageKey });
+  res.json({
+    real: image.realCount,
+    ai: image.aiCount,
+  });
 });
 
 // POST /vote  { url: imageKey, hash: rawHashBits, voteType: "real"|"ai" }
 app.post("/vote", async (req, res) => {
-  const { url: imageKey, hash: hashBits, voteType } = req.body;
-  if (!imageKey || !voteType) return res.status(400).json({ error: "missing params" });
-  if (!["real", "ai"].includes(voteType)) return res.status(400).json({ error: "invalid voteType" });
+  const { url, voteType } = req.body;
 
-  // Same lookup logic: exact → fuzzy → create
-  let image = await Image.findOne({ imageKey });
-
-  if (!image && hashBits) {
-    const fuzzyMatch = await findByHash(hashBits);
-    if (fuzzyMatch) {
-      image = fuzzyMatch;
-    }
+  if (!url || !voteType) {
+    return res.status(400).json({
+      error: "missing url or voteType",
+    });
   }
+
+  let image = await Image.findOne({
+    imageUrl: url,
+  });
 
   if (!image) {
-    image = await Image.create({ imageKey, hashBits: hashBits || null, realCount: 0, aiCount: 0 });
+    image = await Image.create({
+      imageUrl: url,
+      realCount: 0,
+      aiCount: 0,
+    });
   }
 
-  if (voteType === "ai") image.aiCount++;
-  else image.realCount++;
+  if (voteType === "ai") {
+    image.aiCount++;
+  } else if (voteType === "real") {
+    image.realCount++;
+  } else {
+    return res.status(400).json({
+      error: "invalid voteType",
+    });
+  }
+
   await image.save();
 
-  res.json({ real: image.realCount, ai: image.aiCount });
+  res.json({
+    real: image.realCount,
+    ai: image.aiCount,
+  });
 });
 
 const port = 3000;
-app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
+
+app.listen(port, () => {
+  console.log(`server running on http://localhost:${port}`);
+});
+
